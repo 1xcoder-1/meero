@@ -69,7 +69,20 @@ jobs:
             OUT="meero-windows-x64.exe"
           fi
 
-          bun build ./index.ts --compile --target=$TARGET --outfile=$OUT
+          bun build ./index.ts --compile --minify --target=$TARGET --outfile=$OUT
+
+          # Compressed release assets: a bun-compiled binary embeds the whole
+          # runtime (~110 MB raw); gzip/zip cuts the download to roughly 40%.
+          mkdir -p stage
+          if [[ "$TARGET" == "bun-windows-x64" ]]; then
+            cp "$OUT" stage/meero.exe
+            zip -j "${OUT%.exe}.zip" stage/meero.exe
+          else
+            cp "$OUT" stage/meero
+            tar -czf "$OUT.tar.gz" -C stage meero
+          fi
+          rm -f "$OUT"
+          ls -lh meero-*.tar.gz meero-*.zip 2>/dev/null || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

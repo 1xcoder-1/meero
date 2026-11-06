@@ -21,30 +21,47 @@ if ($arch -eq "AMD64") {
     exit 1
 }
 
-$filename = "meero-windows-$arch.exe"
+$filename = "meero-windows-$arch.zip"
 $url = "https://github.com/$repo/releases/latest/download/$filename"
 
 # Compatible with Windows PowerShell 5.1 (New-TemporaryFile only exists in PS 6+)
-$tmp = [System.IO.Path]::GetTempFileName()
+$tmpZip = [System.IO.Path]::ChangeExtension([System.IO.Path]::GetTempFileName(), "zip")
+$tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("meero-extract-" + [System.IO.Path]::GetRandomFileName())
 $installDir = Join-Path $env:USERPROFILE ".local\bin"
 $dest = Join-Path $installDir "meero.exe"
 
 try {
     Write-Host "Downloading $filename..."
-    Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
+    Invoke-WebRequest -Uri $url -OutFile $tmpZip -UseBasicParsing
 } catch {
     Write-Host "X Download failed: $($_.Exception.Message)"
     Write-Host "  Expected release asset at: $url"
     Write-Host "  Check that a release exists: https://github.com/$repo/releases/latest"
-    Remove-Item $tmp -ErrorAction SilentlyContinue
+    Remove-Item $tmpZip -ErrorAction SilentlyContinue
     exit 1
 }
+
+try {
+    # Asset is a zip containing a single meero.exe
+    Expand-Archive -Path $tmpZip -DestinationPath $tmpDir -Force
+    $extracted = Join-Path $tmpDir "meero.exe"
+    if (!(Test-Path $extracted)) {
+        throw "meero.exe not found inside $filename (corrupt download?)"
+    }
+} catch {
+    Write-Host "X Extraction failed: $($_.Exception.Message)"
+    Remove-Item $tmpZip -ErrorAction SilentlyContinue
+    Remove-Item $tmpDir -Recurse -ErrorAction SilentlyContinue
+    exit 1
+}
+Remove-Item $tmpZip -ErrorAction SilentlyContinue
 
 if (!(Test-Path $installDir)) {
     New-Item -ItemType Directory -Path $installDir | Out-Null
 }
 
-Move-Item $tmp $dest -Force
+Move-Item $extracted $dest -Force
+Remove-Item $tmpDir -Recurse -ErrorAction SilentlyContinue
 Write-Host "Installed to $dest"
 
 $path = [Environment]::GetEnvironmentVariable("PATH", "User")

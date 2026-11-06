@@ -37,7 +37,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-This script detects your OS and architecture, downloads the latest release binary, and installs it to `/usr/local/bin` or `~/.local/bin`.
+This script detects your OS and architecture, downloads the latest compressed release (~45 MB instead of the raw ~110 MB binary), extracts it, and installs it to `/usr/local/bin` or `~/.local/bin`.
 
 ### Quick Install (Windows)
 
@@ -231,7 +231,7 @@ meero/
 │   │   ├── sandbox.ts         # Docker execution
 │   │   └── wizard.ts          # chat REPL
 │   └── input.ts               # input parsing & command normalization
-├── test/                      # bun test suite (111 tests)
+├── test/                      # bun test suite (112 tests)
 ├── scripts/
 │   ├── install.sh             # macOS/Linux installer
 │   └── install.ps1            # Windows installer
@@ -243,7 +243,7 @@ meero/
 
 ```bash
 bun install
-bun test              # 111 unit tests
+bun test              # 112 unit tests
 bunx tsc --noEmit     # strict typecheck
 ```
 
