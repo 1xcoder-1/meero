@@ -56,7 +56,12 @@ export function getRecipe(name: string): Recipe | null {
 }
 
 export function listRecipes(): Recipe[] {
-  return Object.values(load()).sort((a, b) => b.createdAt - a.createdAt);
+  // Newest-first. createdAt ties happen on fast machines (same millisecond on
+  // Linux CI), so fall back to insertion order — later-stored recipe wins.
+  return Object.values(load())
+    .map((recipe, i) => ({ recipe, i }))
+    .sort((a, b) => b.recipe.createdAt - a.recipe.createdAt || b.i - a.i)
+    .map(({ recipe }) => recipe);
 }
 
 export function deleteRecipe(name: string): boolean {

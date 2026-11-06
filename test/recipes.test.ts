@@ -1,5 +1,5 @@
 import { expect, test, describe, afterAll } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import os from "os";
 import path from "path";
 import {
@@ -30,6 +30,21 @@ describe("recipes", () => {
     const names = listRecipes().map((r) => r.name);
     expect(names[0]).toBe("second");
     expect(names).toContain("clean-build");
+  });
+
+  test("identical createdAt falls back to insertion order (Linux CI tie-break)", () => {
+    const f = path.join(tmp, "recipes.json");
+    const backup = readFileSync(f, "utf-8");
+    const t = 1_700_000_000_000;
+    writeFileSync(
+      f,
+      JSON.stringify({
+        older: { name: "older", task: "a", commands: ["echo a"], createdAt: t },
+        newer: { name: "newer", task: "b", commands: ["echo b"], createdAt: t },
+      }),
+    );
+    expect(listRecipes().map((r) => r.name)).toEqual(["newer", "older"]);
+    writeFileSync(f, backup); // keep the shared file baseline for later tests
   });
 
   test("overwrite by same name", () => {
