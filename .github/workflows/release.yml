@@ -244,17 +244,18 @@ jobs:
 
       - name: Publish
         run: |
-          if [ -n "${NPM_TOKEN:-}" ]; then
-            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
-            npm publish
-          else
+          if [ -z "${NPM_TOKEN:-}" ]; then
+            echo "::notice::NPM_TOKEN not visible to this job — falling back to npm Trusted Publishing (OIDC)."
             if ! npm publish --provenance; then
-              echo "::error::npm publish failed. Either add an NPM_TOKEN repo secret, or enable npm Trusted Publishing (GitHub repo 1xcoder-1/meero, pattern meero-*.tgz) at www.npmjs.com > Access Tokens > Trusted Publishing."
+              echo "::error::npm publish failed with no token AND no trusted publishing. Fix one of these: (1) add a REPOSITORY secret named NPM_TOKEN at github.com/1xcoder-1/meero/settings/secrets/actions — note that a secret added under Environments is NOT visible here because this job declares no 'environment:'; (2) or enable www.npmjs.com > Access Tokens > Trusted Publishing for repo 1xcoder-1/meero, workflow release.yml, pattern meero-*.tgz."
               exit 1
             fi
+          else
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
+            npm publish
           fi
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || vars.NPM_TOKEN }}
 
   release:
     name: Create Release
