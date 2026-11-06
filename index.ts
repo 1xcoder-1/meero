@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { Command } from "commander";
+import pkg from "./package.json" with { type: "json" };
 import { setup, reset } from "./core/cli/setup";
 import { generateStream } from "./core/ai/stream";
 import { normalizeCommands, parseCommands } from "./core/input";
@@ -368,6 +369,8 @@ function doUndo(id?: string): void {
 
 program
   .name("meero")
+  .description("Natural language → shell commands, run right in this terminal")
+  .version(pkg.version, "-v, --version", "output the version number")
   .argument("[input...]")
   .option("--print", "generate and show commands; never execute")
   .option("--dry-run", "alias of --print")
