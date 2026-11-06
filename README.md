@@ -56,6 +56,19 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/1xcoder-1/meero/main/sc
 
 The binary is installed to `%USERPROFILE%\.local\bin` and added to your user PATH automatically.
 
+### Setup Packages (GitHub Releases)
+
+Prefer a real installer? Every [release](https://github.com/1xcoder-1/meero/releases/latest) ships proper setup packages with the meero icon branding:
+
+| Platform | Asset | Install |
+|---|---|---|
+| Windows | `meero-setup-windows-x64.exe` | Double-click — Start Menu shortcut, user PATH, uninstaller included |
+| Linux (Debian/Ubuntu) | `meero-linux-x64.deb` / `meero-linux-arm64.deb` | `sudo apt install ./meero-linux-x64.deb` |
+| macOS | `meero-macos-arm64.pkg` / `meero-macos-x64.pkg` | Double-click the package, or `sudo installer -pkg meero-macos-arm64.pkg -target /` |
+| Any (terminal) | `meero-*.zip` / `meero-*.tar.gz` | The `curl | bash` / `iwr | iex` scripts above |
+
+The Windows executable carries the meero icon (not the Bun default) and proper version metadata in its properties.
+
 ### From Source
 
 Requires [Bun](https://bun.sh):
@@ -232,11 +245,18 @@ meero/
 │   │   └── wizard.ts          # chat REPL
 │   └── input.ts               # input parsing & command normalization
 ├── test/                      # bun test suite (112 tests)
+├── assets/
+│   ├── meero.png              # app icon (deb/macOS branding)
+│   └── meero.ico              # Windows icon (exe + installer branding)
 ├── scripts/
-│   ├── install.sh             # macOS/Linux installer
-│   └── install.ps1            # Windows installer
+│   ├── install.sh             # macOS/Linux terminal installer
+│   ├── install.ps1            # Windows terminal installer
+│   ├── installer.nsi          # NSIS Windows setup script (CI)
+│   ├── patch-icon.mjs         # swaps Bun icon for meero.ico (CI)
+│   ├── make-ico.ps1           # regenerates meero.ico from meero.png
+│   └── remove-bg.ps1          # regenerates the transparent logo PNG
 └── .github/workflows/
-    └── release.yml            # test gate → cross-compile → GitHub release
+    └── release.yml            # test gate → cross-compile → icon/setup packaging → GitHub release
 ```
 
 ## Development

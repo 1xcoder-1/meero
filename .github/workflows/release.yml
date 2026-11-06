@@ -1,4 +1,4 @@
-name: Build & Release
+name: Release
 
 on:
   push:
@@ -12,7 +12,6 @@ jobs:
   test:
     name: Test & typecheck
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,16 +72,17 @@ jobs:
 
           # Compressed release assets: a bun-compiled binary embeds the whole
           # runtime (~110 MB raw); gzip/zip cuts the download to roughly 40%.
-          mkdir -p stage
+          # The Windows exe stays RAW here — the brand-windows job patches its
+          # icon and re-zips it, so nobody downloads a Bun-logo exe twice.
           if [[ "$TARGET" == "bun-windows-x64" ]]; then
-            cp "$OUT" stage/meero.exe
-            zip -j "${OUT%.exe}.zip" stage/meero.exe
+            echo "keeping raw $OUT for icon patching"
           else
+            mkdir -p stage
             cp "$OUT" stage/meero
             tar -czf "$OUT.tar.gz" -C stage meero
+            rm -f "$OUT"
+            ls -lh "$OUT.tar.gz"
           fi
-          rm -f "$OUT"
-          ls -lh meero-*.tar.gz meero-*.zip 2>/dev/null || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -90,9 +90,137 @@ jobs:
           name: ${{ matrix.target }}
           path: meero-*
 
+  brand-windows:
+    name: Brand & package Windows
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install deps
+        run: bun install
+
+      - name: Download raw exe
+        uses: actions/download-artifact@v4
+        with:
+          name: bun-windows-x64
+          path: .
+
+      - name: Patch icon + metadata (Bun logo -> meero logo)
+        run: |
+          $env:VER = "${{ github.ref_name }}".Substring(1)
+          bun scripts/patch-icon.mjs meero-windows-x64.exe assets/meero.ico $env:VER
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build zip + NSIS setup
+        run: |
+          $env:VER = "${{ github.ref_name }}".Substring(1)
+          New-Item -ItemType Directory stage | Out-Null
+          Copy-Item meero-windows-x64.exe stage/meero.exe
+          Compress-Archive -Path stage/meero.exe -DestinationPath meero-windows-x64.zip -Force
+
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            choco install nsis -y --no-progress | Out-Null
+            $env:Path += ";C:\Program Files (x86)\NSIS"
+          }
+          makensis /DVERSION=$env:VER /DEXE=stage/meero.exe /DOUT=meero-setup-windows-x64.exe scripts/installer.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Item meero-windows-x64.zip, meero-setup-windows-x64.exe | Select-Object Name, Length
+
+      - name: Verify patched metadata
+        run: |
+          $vi = (Get-Item stage/meero.exe).VersionInfo
+          if ($vi.ProductName -ne "meero") { throw "expected ProductName 'meero', got '$($vi.ProductName)'" }
+          Write-Host "ProductName=$($vi.ProductName) FileDescription=$($vi.FileDescription) Version=$($vi.FileVersion)"
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            meero-windows-x64.zip
+            meero-setup-windows-x64.exe
+
+  installer-linux:
+    name: Build .deb packages
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bun-linux-*
+          path: .
+          merge-multiple: true
+
+      - name: Build debs
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          sudo gem install fpm --no-document
+          for arch in x64 arm64; do
+            mkdir -p "stage-$arch/usr/bin" "stage-$arch/usr/share/icons/hicolor/512x512/apps"
+            tar -xzOf "meero-linux-$arch.tar.gz" meero > "stage-$arch/usr/bin/meero"
+            chmod +x "stage-$arch/usr/bin/meero"
+            cp assets/meero.png "stage-$arch/usr/share/icons/hicolor/512x512/apps/meero.png"
+            case "$arch" in
+              x64)   DEB_ARCH=amd64 ;;
+              arm64) DEB_ARCH=arm64 ;;
+            esac
+            fpm -s dir -t deb -n meero -v "$VER" -a "$DEB_ARCH" \
+              --license MIT --maintainer "1xcoder" \
+              --url "https://github.com/1xcoder-1/meero" \
+              --description "Natural language to shell commands CLI" \
+              -p "meero-linux-$arch.deb" -C "stage-$arch" usr
+          done
+          ls -lh meero-linux-*.deb
+
+      - name: Upload debs
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installers
+          path: meero-linux-*.deb
+
+  installer-macos:
+    name: Build .pkg installers
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bun-darwin-*
+          path: .
+          merge-multiple: true
+
+      - name: Build pkgs
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          for arch in arm64 x64; do
+            mkdir -p "stage-$arch"
+            tar -xzOf "meero-macos-$arch.tar.gz" meero > "stage-$arch/meero"
+            chmod +x "stage-$arch/meero"
+            pkgbuild --root "stage-$arch" --identifier com.1xcoder.meero \
+              --version "$VER" --install-location /usr/local/bin \
+              "meero-macos-$arch.pkg"
+          done
+          ls -lh meero-macos-*.pkg
+
+      - name: Upload pkgs
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installers
+          path: meero-macos-*.pkg
+
   release:
     name: Create Release
-    needs: build
+    needs: [build, brand-windows, installer-linux, installer-macos]
     runs-on: ubuntu-latest
 
     steps:
@@ -104,7 +232,8 @@ jobs:
       - name: Flatten files
         run: |
           mkdir release
-          find dist -type f -exec mv {} release/ \;
+          find dist -type f -exec mv -f {} release/ \;
+          ls -lh release/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
