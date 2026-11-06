@@ -243,19 +243,35 @@ jobs:
         run: node -e "const s=require('fs').readFileSync('dist/index.js','utf8'); if(!s.startsWith('#!/usr/bin/env bun')) throw new Error('shebang missing')" && bun dist/index.js --version
 
       - name: Publish
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || vars.NPM_TOKEN }}
         run: |
+          # Failures are echoed as annotations so they are readable without log access.
+          # The token value is never printed; npm's own output is redacted defensively.
           if [ -z "${NPM_TOKEN:-}" ]; then
-            echo "::notice::NPM_TOKEN not visible to this job — falling back to npm Trusted Publishing (OIDC)."
-            if ! npm publish --provenance; then
-              echo "::error::npm publish failed with no token AND no trusted publishing. Fix one of these: (1) add a REPOSITORY secret named NPM_TOKEN at github.com/1xcoder-1/meero/settings/secrets/actions — note that a secret added under Environments is NOT visible here because this job declares no 'environment:'; (2) or enable www.npmjs.com > Access Tokens > Trusted Publishing for repo 1xcoder-1/meero, workflow release.yml, pattern meero-*.tgz."
+            echo '::notice::NPM_TOKEN is EMPTY in this job (secrets.NPM_TOKEN and vars.NPM_TOKEN both unset for this scope). Values stored under an Environment reach only jobs that declare that environment.'
+            if OUT=$(npm publish --provenance 2>&1); then
+              echo 'Published using Trusted Publishing (OIDC).'
+            else
+              printf '::error::trusted-publishing attempt failed: %s\n' "$(printf '%s' "$OUT" | tr '\n' ' ' | head -c 700)"
               exit 1
             fi
           else
-            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
-            npm publish
+            echo "::notice::NPM_TOKEN is present (${#NPM_TOKEN} chars) — using token auth."
+            # Any npm output could theoretically echo the credential, so redact every message.
+            redact() { printf '%s' "$1" | sed "s|${NPM_TOKEN}|[REDACTED]|g" | tr '\n' ' ' | head -c 700; }
+            umask 077
+            printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
+            if ! WHO=$(npm whoami 2>&1); then
+              printf '::warning::npm whoami rejected the token (invalid/expired, 2FA not bypassed, or missing publish scope): %s\n' "$(redact "$WHO")"
+            fi
+            if OUT=$(npm publish 2>&1); then
+              echo "Published $(node -p "require('./package.json').version") to npm."
+            else
+              printf '::error::npm publish failed: %s\n' "$(redact "$OUT")"
+              exit 1
+            fi
           fi
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN || vars.NPM_TOKEN }}
 
   release:
     name: Create Release
