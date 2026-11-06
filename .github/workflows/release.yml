@@ -127,7 +127,9 @@ jobs:
             choco install nsis -y --no-progress | Out-Null
             $env:Path += ";C:\Program Files (x86)\NSIS"
           }
-          makensis /DVERSION=$env:VER /DEXE=stage/meero.exe /DOUT=meero-setup-windows-x64.exe scripts/installer.nsi
+          # NSIS resolves relative paths against the script's directory, so
+          # everything is passed as absolute.
+          & makensis /DVERSION=$env:VER "/DEXE=$PWD\stage\meero.exe" "/DICON=$PWD\assets\meero.ico" "/DOUT=$PWD\meero-setup-windows-x64.exe" scripts\installer.nsi
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-Item meero-windows-x64.zip, meero-setup-windows-x64.exe | Select-Object Name, Length
 

@@ -1,6 +1,8 @@
 ; meero Windows installer (NSIS) — built in CI:
-;   makensis /DVERSION=1.1.0 /DEXE=stage/meero.exe /DOUT=meero-setup-windows-x64.exe scripts\installer.nsi
-; Per-user install (no admin), Start Menu shortcut, PATH entry, proper uninstaller.
+;   makensis /DVERSION=1.1.0 /DEXE=<abs path to meero.exe> /DICON=<abs path to meero.ico> /DOUT=<abs setup.exe> scripts\installer.nsi
+; NSIS resolves relative paths against the script's own directory, so CI must
+; pass absolute paths for EXE / ICON / OUT. Per-user install (no admin),
+; Start Menu shortcut, PATH entry, proper uninstaller.
 
 Unicode true
 !include "MUI2.nsh"
@@ -13,15 +15,19 @@ Unicode true
 !ifndef EXE
   !define EXE "meero.exe"
 !endif
+!ifndef ICON
+  !define ICON "..\assets\meero.ico"
+!endif
 !ifndef OUT
   !define OUT "meero-setup.exe"
 !endif
 
-${StrRep} ; embed the StrRep function (StrFunc top-level usage)
+${UnStrRep} ; embed the uninstall-only variant (calls use ${UnStrRep} too)
+${StrRep}    ; embed the install-context StrRep function (StrFunc usage)
 
 !define MUI_ABORTWARNING
-!define MUI_ICON "assets/meero.ico"
-!define MUI_UNICON "assets/meero.ico"
+!define MUI_ICON "${ICON}"
+!define MUI_UNICON "${ICON}"
 !define MUI_WELCOMEPAGE_TITLE "Welcome to the meero setup"
 !define MUI_WELCOMEPAGE_TEXT "This will install the meero CLI (natural language -> shell commands).$\r$\n$\r$\nAfter installation, open a NEW terminal and run:$\r$\n    meero setup"
 !define MUI_FINISHPAGE_TEXT "Open a new terminal, then run:$\r$\n    meero setup"
@@ -41,11 +47,22 @@ RequestExecutionLevel user
 !insertmacro MUI_LANGUAGE "English"
 
 ; --- rebuild the per-user PATH with $INSTDIR exactly once (install + uninstall share it)
-!macro SetUserPath
+!macro SetUserPathInstall
   ReadRegStr $0 HKCU "Environment" "Path"
-  ${StrRep} $1 $0 "$INSTDIR;" ""
-  ${StrRep} $2 $1 ";$INSTDIR" ""
+  ${StrRep} $1 $0 ";$INSTDIR" ""
+  ${StrRep} $2 $1 "$INSTDIR;" ""
   ${StrRep} $3 $2 "$INSTDIR" ""
+  StrCpy $4 $3 1
+  ${If} $4 == ";"
+    StrCpy $3 $3 "" 1
+  ${EndIf}
+!macroend
+
+!macro SetUserPathUninstall
+  ReadRegStr $0 HKCU "Environment" "Path"
+  ${UnStrRep} $1 $0 ";$INSTDIR" ""
+  ${UnStrRep} $2 $1 "$INSTDIR;" ""
+  ${UnStrRep} $3 $2 "$INSTDIR" ""
   StrCpy $4 $3 1
   ${If} $4 == ";"
     StrCpy $3 $3 "" 1
@@ -61,12 +78,13 @@ Section "Install"
   CreateShortCut "$SMPROGRAMS\meero\meero.lnk" "$INSTDIR\meero.exe"
   CreateShortCut "$SMPROGRAMS\meero\Uninstall meero.lnk" "$INSTDIR\uninstall.exe"
 
-  ; PATH (HKCU\Environment) — strip any old entries first, then append once
-  !insertmacro SetUserPath
+  ; PATH (HKCU\Environment) — strip any old entries first, then append once.
+  ; WriteRegExpandStr keeps the value expandable if the user had %tokens% there.
+  !insertmacro SetUserPathInstall
   ${If} $3 == ""
-    WriteRegStr HKCU "Environment" "Path" "$INSTDIR"
+    WriteRegExpandStr HKCU "Environment" "Path" "$INSTDIR"
   ${Else}
-    WriteRegStr HKCU "Environment" "Path" "$3;$INSTDIR"
+    WriteRegExpandStr HKCU "Environment" "Path" "$3;$INSTDIR"
   ${EndIf}
   SendMessage "${HWND_BROADCAST}" ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
 
@@ -94,9 +112,16 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\meero\Uninstall meero.lnk"
   RMDir "$SMPROGRAMS\meero"
 
-  ; PATH — remove $INSTDIR occurrences, keep the rest untouched
-  !insertmacro SetUserPath
-  WriteRegStr HKCU "Environment" "Path" "$3"
+  ; PATH — remove $INSTDIR occurrences; never touch the value if it never
+  ; contained us (avoids re-writing/expanding an unrelated user PATH).
+  !insertmacro SetUserPathUninstall
+  ${If} $0 != ""
+    ${If} $3 == ""
+      DeleteRegValue HKCU "Environment" "Path"
+    ${Else}
+      WriteRegExpandStr HKCU "Environment" "Path" "$3"
+    ${EndIf}
+  ${EndIf}
   SendMessage "${HWND_BROADCAST}" ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
 
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\App Paths\meero.exe"
