@@ -64,7 +64,6 @@ Requires [Bun](https://bun.sh):
 git clone https://github.com/1xcoder-1/meero.git
 cd meero
 bun install
-bun run index.ts "delete all .tmp files"
 ```
 
 ## Configuration
