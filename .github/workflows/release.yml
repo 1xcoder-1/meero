@@ -1,0 +1,101 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test & typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install deps
+        run: bun install
+
+      - name: Unit tests
+        run: bun test
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
+
+  build:
+    name: Build binaries
+    needs: test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        target:
+          - bun-darwin-arm64
+          - bun-darwin-x64
+          - bun-linux-x64
+          - bun-linux-arm64
+          - bun-windows-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install deps
+        run: bun install
+
+      - name: Build
+        run: |
+          TARGET=${{ matrix.target }}
+
+          if [[ "$TARGET" == "bun-darwin-arm64" ]]; then
+            OUT="meero-macos-arm64"
+          elif [[ "$TARGET" == "bun-darwin-x64" ]]; then
+            OUT="meero-macos-x64"
+          elif [[ "$TARGET" == "bun-linux-x64" ]]; then
+            OUT="meero-linux-x64"
+          elif [[ "$TARGET" == "bun-linux-arm64" ]]; then
+            OUT="meero-linux-arm64"
+          elif [[ "$TARGET" == "bun-windows-x64" ]]; then
+            OUT="meero-windows-x64.exe"
+          fi
+
+          bun build ./index.ts --compile --target=$TARGET --outfile=$OUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: meero-*
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Flatten files
+        run: |
+          mkdir release
+          find dist -type f -exec mv {} release/ \;
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
