@@ -13,7 +13,7 @@ An AI-powered CLI that converts natural language tasks into shell commands — i
 - **Undo** — every mutating task snapshots its targets first; `meero undo` restores deleted/moved files from trash
 - **Self-Repair** — when a command fails, meero captures its real output and lets the AI fix the remaining steps (up to 3 rounds)
 - **Task History** — past sessions are remembered; `meero history` lists them
-- **Recipes** — save a proven command sequence once, replay it later without burning tokens (`meero run <name>`)
+- **Recipes** — save a proven command sequence once, replay it later without burning tokens (`meero run <name>`), and share them as files (`meero recipe export` / `import`)
 - **Trust Levels** — low / med / high per directory; high auto-runs while the safety gate stays armed
 - **Wizard Mode** — run `meero` with no arguments for a continuous chat REPL with carried context
 - **Cheap Mode** — local-first generation via Ollama with automatic escalation to cloud (`meero local on`)
@@ -22,6 +22,14 @@ An AI-powered CLI that converts natural language tasks into shell commands — i
 - **Non-interactive Flags** — `--print` (commands only, never executes), `--copy` (straight to clipboard)
 
 ## Installation
+
+### Via bunx (smallest download — needs Bun only)
+
+```bash
+bunx meero commit all my changes
+```
+
+The npm package is a ~0.6 MB self-contained bundle — no 50 MB binary download, always latest. First run asks for setup.
 
 ### Quick Install (macOS / Linux)
 
@@ -120,9 +128,13 @@ A continuous REPL — context carries between tasks. Slash commands: `/undo`, `/
 After a multi-command task succeeds, meero offers to save it as a recipe. Replay any time — no LLM call, no cost:
 
 ```bash
-meero recipes            # list saved recipes
-meero run clean-build    # execute one (still asks for confirmation)
-meero recipe rm <name>   # delete a recipe
+meero recipes                       # list saved recipes
+meero run clean-build               # execute one (still asks for confirmation)
+meero recipe rm <name>              # delete a recipe
+meero recipe export team.json       # bundle ALL recipes into a shareable file
+meero recipe export x.json deploy   # …or only the named ones
+meero recipe import team.json       # merge them in (name clashes are skipped)
+meero recipe import team.json --force  # overwrite same-named recipes
 ```
 
 ### Trust Levels

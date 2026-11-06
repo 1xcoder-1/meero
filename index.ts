@@ -35,7 +35,9 @@ import {
 } from "./core/cli/trust";
 import {
   deleteRecipe,
+  exportRecipesToFile,
   getRecipe,
+  importRecipesFromFile,
   listRecipes,
   saveRecipe,
 } from "./core/cli/recipes";
@@ -490,9 +492,10 @@ program
 program
   .command("recipe")
   .description("Saved command playbooks")
-  .argument("<action>", "list | rm <name>")
-  .argument("[name]", "recipe name")
-  .action((action: string, name?: string) => {
+  .argument("<action>", "list | rm <name> | export [file] [names...] | import <file>")
+  .argument("[args...]", "action arguments")
+  .option("--force", "overwrite same-named recipes on import")
+  .action((action: string, args: string[], opts: { force?: boolean }) => {
     if (action === "list" || !action) {
       const rs = listRecipes();
       if (rs.length === 0) return console.log("No recipes yet.");
@@ -504,6 +507,7 @@ program
       return;
     }
     if (action === "rm") {
+      const name = args[0];
       if (!name) return console.error(chalk.red("Usage: meero recipe rm <name>"));
       console.log(
         deleteRecipe(name)
@@ -512,7 +516,43 @@ program
       );
       return;
     }
-    console.error(chalk.red(`Unknown recipe action "${action}" — use list or rm`));
+    if (action === "export") {
+      const file = args[0] ?? "meero-recipes.json";
+      const names = args.slice(1);
+      const { count, missing } = exportRecipesToFile(file, names.length ? names : null);
+      if (count === 0)
+        return console.error(chalk.red("Nothing to export — no matching recipes."));
+      if (missing.length > 0)
+        console.log(chalk.yellow(`Not found (skipped): ${missing.join(", ")}`));
+      console.log(
+        chalk.green(`Exported ${count} recipe(s) to ${file} — share the file, then: meero recipe import ${file}`),
+      );
+      return;
+    }
+    if (action === "import") {
+      const file = args[0];
+      if (!file) return console.error(chalk.red("Usage: meero recipe import <file> [--force]"));
+      let res;
+      try {
+        res = importRecipesFromFile(file, opts.force);
+      } catch (e) {
+        return console.error(
+          chalk.red(`Could not import "${file}": ${(e as Error).message}`),
+        );
+      }
+      const parts = [`${res.imported.length} imported`];
+      if (res.skipped.length)
+        parts.push(`${res.skipped.length} skipped (already exist — use --force to overwrite): ${res.skipped.join(", ")}`);
+      if (res.invalid)
+        parts.push(`${res.invalid} invalid entries ignored`);
+      console.log(chalk.green(`Imported ${file}: ${parts.join(" · ")}.`));
+      return;
+    }
+    console.error(
+      chalk.red(
+        `Unknown recipe action "${action}" — use list, rm, export or import`,
+      ),
+    );
   });
 
 program

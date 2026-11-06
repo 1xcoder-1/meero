@@ -1,10 +1,14 @@
 import { expect, test, describe, afterAll } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import os from "os";
 import path from "path";
 import {
   deleteRecipe,
+  exportRecipes,
+  exportRecipesToFile,
   getRecipe,
+  importBundle,
+  importRecipesFromFile,
   listRecipes,
   saveRecipe,
 } from "../core/cli/recipes";
@@ -62,6 +66,76 @@ describe("recipes", () => {
   test("corrupt entries are ignored, not fatal", () => {
     writeFileSync(path.join(tmp, "recipes.json"), '{"x": 5, "y": {"name": "y", "commands": ["ls"], "createdAt": 1, "task": "t"}}');
     expect(listRecipes().map((r) => r.name)).toEqual(["y"]);
+  });
+
+  describe("export / import", () => {
+    const bundleFile = path.join(tmp, "shared.json");
+
+    test("export all produces a versioned bundle", () => {
+      saveRecipe("deploy", "deploy app", ["npm run build", "npm run start"]);
+      const { bundle, missing } = exportRecipes(null);
+      expect(missing).toEqual([]);
+      expect(bundle.format).toBe("meero-recipes");
+      expect(bundle.version).toBe(1);
+      expect(bundle.recipes.map((r) => r.name)).toContain("deploy");
+    });
+
+    test("export named recipes reports missing ones", () => {
+      const { bundle, missing } = exportRecipes(["deploy", "ghost"]);
+      expect(bundle.recipes.map((r) => r.name)).toEqual(["deploy"]);
+      expect(missing).toEqual(["ghost"]);
+    });
+
+    test("round-trip: export to file, wipe store, import back", () => {
+      exportRecipesToFile(bundleFile, ["deploy"]);
+      const exported = JSON.parse(readFileSync(bundleFile, "utf-8"));
+      expect(exported.recipes.length).toBe(1);
+
+      deleteRecipe("deploy");
+      expect(getRecipe("deploy")).toBeNull();
+
+      const res = importRecipesFromFile(bundleFile);
+      expect(res.imported).toEqual(["deploy"]);
+      expect(getRecipe("deploy")?.commands).toEqual(["npm run build", "npm run start"]);
+    });
+
+    test("import skips existing names unless --force", () => {
+      const res = importBundle(
+        { format: "meero-recipes", version: 1, exportedAt: 0, recipes: [{ name: "deploy", task: "new task", commands: ["changed"], createdAt: 1 }] },
+      );
+      expect(res.skipped).toEqual(["deploy"]);
+      expect(getRecipe("deploy")?.commands).toEqual(["npm run build", "npm run start"]);
+
+      const forced = importBundle(
+        { format: "meero-recipes", version: 1, exportedAt: 0, recipes: [{ name: "deploy", task: "new task", commands: ["changed"], createdAt: 1 }] },
+        true,
+      );
+      expect(forced.imported).toEqual(["deploy"]);
+      expect(getRecipe("deploy")?.commands).toEqual(["changed"]);
+    });
+
+    test("raw recipes.json map is also importable", () => {
+      const res = importBundle({ quick: { name: "quick", task: "t", commands: ["echo q"], createdAt: 5 } });
+      expect(res.imported).toEqual(["quick"]);
+      expect(getRecipe("quick")).not.toBeNull();
+    });
+
+    test("invalid entries counted, garbage shape throws", () => {
+      const res = importBundle({ recipes: [{ name: "bad" }, { name: "ok", commands: ["ls"], task: "", createdAt: 1 }] });
+      expect(res.invalid).toBe(1);
+      expect(res.imported).toEqual(["ok"]);
+      expect(() => importBundle("just a string")).toThrow(/not a meero recipe file/);
+      expect(() => importBundle([1, 2])).toThrow(/not a meero recipe file/);
+    });
+
+    test("empty export does not clobber an existing bundle file", () => {
+      writeFileSync(bundleFile, '{"format":"meero-recipes","version":1,"recipes":[{"name":"keep","commands":["ls"],"task":"","createdAt":1}]}');
+      const { count } = exportRecipesToFile(bundleFile, ["does-not-exist"]);
+      expect(count).toBe(0);
+      expect(readFileSync(bundleFile, "utf-8")).toContain("keep");
+      rmSync(bundleFile, { force: true });
+      expect(existsSync(bundleFile)).toBe(false); // still untouched, not created
+    });
   });
 
   afterAll(() => rmSync(tmp, { recursive: true, force: true }));

@@ -1,12 +1,11 @@
 {
   "name": "meero",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "module": "index.ts",
   "scripts": {
     "build:npm": "bun build index.ts --outfile dist/index.js --target bun",
     "test": "bun test"
   },
-  "private": true,
   "description": "An AI-powered CLI planner that converts natural language tasks into executable shell commands. Describe what you want to do in plain English, and meero will inspect your system, generate the appropriate commands, and ask for confirmation before executing them.",
   "author": {
     "name": "1xcoder",
@@ -24,18 +23,25 @@
   "bin": {
     "meero": "./dist/index.js"
   },
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "shell",
+    "natural-language",
+    "command-generation",
+    "terminal"
+  ],
   "files": [
     "dist"
   ],
   "type": "module",
   "devDependencies": {
     "@types/bun": "latest",
-    "rcedit": "^5.0.2"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "dependencies": {
+    "typescript": "^5",
+    "rcedit": "^5.0.2",
     "@ai-sdk/anthropic": "^3.0.71",
     "@ai-sdk/google": "^3.0.64",
     "@ai-sdk/groq": "^3.0.35",

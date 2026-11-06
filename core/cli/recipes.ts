@@ -71,3 +71,94 @@ export function deleteRecipe(name: string): boolean {
   save(all);
   return true;
 }
+
+/** Shareable bundle: `meero recipe export` writes this, `import` reads it back */
+export interface RecipeBundle {
+  format: "meero-recipes";
+  version: 1;
+  exportedAt: number;
+  recipes: Recipe[];
+}
+
+export interface ImportResult {
+  imported: string[];
+  skipped: string[];
+  invalid: number;
+}
+
+/** Validation for recipes arriving from an external file */
+function sanitizeRecipe(v: unknown): Recipe | null {
+  const r = v as Recipe;
+  if (!r || typeof r.name !== "string" || !r.name.trim() || !Array.isArray(r.commands))
+    return null;
+  return {
+    name: r.name,
+    task: typeof r.task === "string" ? r.task : "",
+    commands: r.commands.map(String),
+    createdAt: typeof r.createdAt === "number" ? r.createdAt : Date.now(),
+  };
+}
+
+export function exportRecipes(
+  names: string[] | null,
+): { bundle: RecipeBundle; missing: string[] } {
+  const all = load();
+  const missing: string[] = [];
+  let items: Recipe[];
+  if (names && names.length > 0) {
+    items = [];
+    for (const n of names) {
+      if (all[n]) items.push(all[n]);
+      else missing.push(n);
+    }
+  } else {
+    items = listRecipes();
+  }
+  return {
+    bundle: { format: "meero-recipes", version: 1, exportedAt: Date.now(), recipes: items },
+    missing,
+  };
+}
+
+/** Merge a bundle (or a raw recipes.json map) into the local store */
+export function importBundle(data: unknown, force = false): ImportResult {
+  let candidates: unknown[];
+  const b = data as RecipeBundle;
+  if (b && Array.isArray(b.recipes)) candidates = b.recipes;
+  else if (data && typeof data === "object" && !Array.isArray(data))
+    candidates = Object.values(data);
+  else throw new Error("not a meero recipe file (expected a JSON object)");
+
+  const all = load();
+  const result: ImportResult = { imported: [], skipped: [], invalid: 0 };
+  for (const v of candidates) {
+    const r = sanitizeRecipe(v);
+    if (!r) {
+      result.invalid++;
+      continue;
+    }
+    if (all[r.name] && !force) {
+      result.skipped.push(r.name);
+      continue;
+    }
+    all[r.name] = r;
+    result.imported.push(r.name);
+  }
+  save(all);
+  return result;
+}
+
+/** CLI-facing wrappers: write/read a shareable bundle on disk */
+export function exportRecipesToFile(
+  file: string,
+  names: string[] | null,
+): { count: number; missing: string[] } {
+  const { bundle, missing } = exportRecipes(names);
+  // An empty export would only clobber a previous, real bundle — skip the write
+  if (bundle.recipes.length > 0) writeFileSync(file, JSON.stringify(bundle, null, 2));
+  return { count: bundle.recipes.length, missing };
+}
+
+export function importRecipesFromFile(file: string, force = false): ImportResult {
+  return importBundle(JSON.parse(readFileSync(file, "utf-8")), force);
+}

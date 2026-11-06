@@ -220,6 +220,42 @@ jobs:
           name: macos-installers
           path: meero-macos-*.pkg
 
+  publish-npm:
+    name: Publish to npm
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # npm provenance via GitHub OIDC trusted publishing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install deps
+        run: bun install
+
+      - name: Build bundle
+        run: bun run build:npm
+
+      - name: Smoke-test the bundle
+        run: node -e "const s=require('fs').readFileSync('dist/index.js','utf8'); if(!s.startsWith('#!/usr/bin/env bun')) throw new Error('shebang missing')" && bun dist/index.js --version
+
+      - name: Publish
+        run: |
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
+            npm publish
+          else
+            if ! npm publish --provenance; then
+              echo "::error::npm publish failed. Either add an NPM_TOKEN repo secret, or enable npm Trusted Publishing (GitHub repo 1xcoder-1/meero, pattern meero-*.tgz) at www.npmjs.com > Access Tokens > Trusted Publishing."
+              exit 1
+            fi
+          fi
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   release:
     name: Create Release
     needs: [build, brand-windows, installer-linux, installer-macos]
@@ -234,7 +270,9 @@ jobs:
       - name: Flatten files
         run: |
           mkdir release
-          find dist -type f -exec mv -f {} release/ \;
+          # The raw (unbranded, uncompressed) Windows exe is only an internal
+          # hand-off to brand-windows; the release ships the zip + setup instead.
+          find dist -type f ! -name 'meero-windows-x64.exe' -exec mv -f {} release/ \;
           ls -lh release/
 
       - name: Create Release
