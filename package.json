@@ -1,6 +1,6 @@
 {
   "name": "meero",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "module": "index.ts",
   "scripts": {
     "build:npm": "bun build index.ts --outfile dist/index.js --target bun",

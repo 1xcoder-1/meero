@@ -89,6 +89,7 @@ describe("direct commands (run packs without the builtin word)", () => {
   const RESERVED = [
     "setup", "model", "reset", "undo", "history", "trust", "local",
     "recipe", "recipes", "run", "builtin", "builtins", "help", "version",
+    "settings", "commands",
   ];
 
   test("aliases are unique and never shadow pack ids or meero commands", () => {

@@ -20,6 +20,7 @@ An AI-powered CLI that converts natural language tasks into shell commands — i
 - **Trust Levels** — low / med / high per directory; high auto-runs while the safety gate stays armed
 - **Cost Transparency** — every task prints a dim line with tokens in/out and the approximate dollar cost, so the bill never surprises you
 - **No Chat Mode** — running `meero` with no task prints the help box; AI is only ever invoked for a real developer task (`meero commit all my changes`), and settings live in real commands: `meero settings`, `meero model`, `meero trust`
+- **Slash Commands** — every local command also runs as `meero /xyz`: `/settings` `/model` `/builtin` `/undo` `/trust` `/commands` `/help` `/exit`. meero checks slash → built-in pack → then the AI, so a command that exists locally can never leak into a model call
 - **Cheap Mode** — local-first generation via Ollama with automatic escalation to cloud (`meero local on`)
 - **Sandbox** — execute commands inside a throwaway Docker container (`--sandbox`)
 - **Non-interactive Flags** — `--print` (commands only, never executes), `--copy` (straight to clipboard)
@@ -118,6 +119,32 @@ meero hi       # refused before any AI call — meero is a tool, not a chatbot
 ```
 
 AI runs only for a real developer task: `meero commit all my changes`, `meero what command shows disk usage`. Even then the model is contract-bound to return shell commands — small talk comes back as nothing, and it may not touch its tools for it.
+
+### Slash Commands
+
+Every command meero can answer locally also works in slash form — same behaviour, same arguments, **no AI call**:
+
+```bash
+meero /settings              # provider, model and cheap mode in one page
+meero /model                 # list models (or: meero /model gemini-2.5-flash)
+meero /builtin               # the pre-built pack menu
+meero /undo                  # revert the last task  (/undo --list for snapshots)
+meero /trust low             # confirmation strictness (/trust shows the current one)
+meero /commands              # full reference: every command, flag and pack
+meero /help                  # the short help box
+meero /exit                  # nothing to exit — one task per call
+```
+
+Routing happens in that order, before the model is ever considered:
+
+| Typed | Resolves to | AI called? |
+| --- | --- | --- |
+| `meero /settings` | slash command → settings page | no |
+| `meero status 3000` | built-in pack → runs directly | no |
+| `meero hi` | chat guardrail → refused | no |
+| `meero commit all my changes` | developer task → AI generates commands | yes |
+
+`meero /xyz` and the plain subcommand (`meero settings`) are the same code path — nothing is duplicated, and an unknown `/xyz` is answered with a hint instead of being sent to the AI.
 
 ### Recipes
 
@@ -355,10 +382,12 @@ meero/
 │   │   ├── recipes.ts         # saved command sequences
 │   │   ├── builtin.ts         # 60 pre-built command packs (no AI, auto shell detect)
 │   │   ├── guardrail.ts       # casual-chat guardrail + meero-prefix strip
+│   │   ├── router.ts          # slash → pack → meta → chat → AI decision order
+│   │   ├── reference.ts       # /commands page, generated from the pack catalog
 │   │   ├── clipboard.ts       # cross-platform copy
 │   │   └── sandbox.ts         # Docker execution
 │   └── input.ts               # input parsing & command normalization
-├── test/                      # bun test suite (167 tests)
+├── test/                      # bun test suite (177 tests)
 ├── assets/
 │   ├── meero.png              # app icon (deb/macOS branding)
 │   └── meero.ico              # Windows icon (exe + installer branding)
