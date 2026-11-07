@@ -1,6 +1,4 @@
-import os from "os";
-
-const isWindows = os.platform() === "win32";
+import { detectShell } from "./shell";
 
 /** Memory guard: never buffer more than this per command */
 export const CAP_CHARS = 30_000;
@@ -44,13 +42,14 @@ export async function drainStreams(
  * Run a shell command with output streaming LIVE to the terminal AND a
  * captured copy + exit code, so failed commands can be fed back to the
  * AI for an automatic repair round (session error-recovery loop).
+ * The spawn shell comes from detectShell() — the same shell the system
+ * prompt was built for, so generated syntax always matches the executor.
  */
 export async function runCMDCapture(cmd: string): Promise<CMDResult> {
-  const argv = isWindows
-    ? ["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd]
-    : ["bash", "-c", cmd];
-
-  const proc = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe" });
+  const proc = Bun.spawn(detectShell().argv(cmd), {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
 
   const output = await drainStreams(proc);
   // `exited` is the reliable source: `exitCode` can resolve null after

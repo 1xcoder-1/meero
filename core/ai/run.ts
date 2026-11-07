@@ -17,6 +17,7 @@ export async function runLLM(
   model: any,
   prompt: string,
   history?: ModelMessage[],
+  systemPrompt?: string,
 ): Promise<RunResult> {
   const usage = emptyUsage();
   try {
@@ -24,7 +25,7 @@ export async function runLLM(
 
     const result = streamText({
       model,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt ?? SYSTEM_PROMPT,
       ...(history && history.length > 0
         ? { messages: [...history, { role: "user", content: prompt }] }
         : { prompt }),

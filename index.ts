@@ -8,6 +8,8 @@ import { normalizeCommands, parseCommands } from "./core/input";
 import { select, input } from "@inquirer/prompts";
 import boxen from "boxen";
 import { runCMDCapture } from "./core/cli/run";
+import { detectShell, SANDBOX_SHELL } from "./core/cli/shell";
+import { buildSystemPrompt } from "./core/ai/system-prompt";
 import { safetyGate } from "./core/cli/safety";
 import {
   buildFixPrompt,
@@ -49,7 +51,6 @@ import {
 } from "./core/cli/sandbox";
 import { startWizard } from "./core/cli/wizard";
 import { ollamaAvailable } from "./core/ai/providers";
-import { formatUsage } from "./core/ai/usage";
 import { changeModel, loadConfig, overwriteConfig } from "./core/cli/config";
 import type { ModelMessage } from "ai";
 import chalk from "chalk";
@@ -72,7 +73,7 @@ async function snapshotFor(commands: string[]): Promise<string | null> {
     const snapId = await createSnapshot(commands);
     if (snapId)
       console.log(
-        chalk.dim(`\n↺ Snapshot ${snapId} saved — revert with: meero undo`),
+        chalk.dim(`\n↺ Snapshot ${snapId} — revert: meero undo`),
       );
     return snapId;
   } catch (e) {
@@ -167,8 +168,9 @@ async function runTask(
           remaining: queue.length,
           round,
         }),
+        // repair runs in the same execution context as the original task
+        ctx.sandboxImage ? { systemPrompt: buildSystemPrompt(SANDBOX_SHELL) } : {},
       );
-      console.log(chalk.dim(`  ${formatUsage(res.usage, res.modelUsed)}`));
       const candidate = normalizeCommands(parseCommands(res.text ?? ""));
       if (candidate.length === 0) {
         console.log(chalk.yellow("AI produced no fix for this failure."));
@@ -183,15 +185,8 @@ async function runTask(
       break;
     }
 
-    console.log(
-      boxen(fixed.join("\n"), {
-        padding: 1,
-        borderStyle: "round",
-        borderColor: "magenta",
-        title: `AI fix — round ${round}`,
-        titleAlignment: "left",
-      }),
-    );
+    console.log(chalk.magenta(`AI fix — round ${round}:`));
+    console.log(fixed.map((c) => chalk.magenta(`  ${c}`)).join("\n"));
     await safetyGate(fixed);
     await snapshotFor(fixed);
     // The fix replaces everything still pending for this task
@@ -255,9 +250,12 @@ async function handleTask(
   opts: RunOpts,
   session?: ModelMessage[],
 ): Promise<void> {
+  const sandboxImage = sandboxImageOf(opts);
   const gen = await generateStream(text, {
     history: session,
     preferLocal: opts.local,
+    // inside docker the executor is POSIX sh, whatever the host is
+    ...(sandboxImage ? { systemPrompt: buildSystemPrompt(SANDBOX_SHELL) } : {}),
   });
 
   const parsed = parseCommands(gen.text ?? "");
@@ -274,24 +272,11 @@ async function handleTask(
   if (!content) {
     if (gen.text && gen.text.trim()) console.log(gen.text.trim());
     else
-      console.log(
-        boxen("\nNo commands generated.\nTry being more specific.", {
-          padding: 1,
-          borderStyle: "round",
-          borderColor: "red",
-        }),
-      );
+      console.log(chalk.red("No commands generated — try being more specific."));
     return;
   }
 
-  console.log(
-    boxen(content, {
-      padding: 1,
-      borderStyle: "round",
-      borderColor: "cyan",
-    }),
-  );
-  console.log(chalk.dim(`  ${formatUsage(gen.usage, gen.modelUsed)}`));
+  console.log(normalized.map((c, i) => chalk.cyan(`${i + 1}. ${c}`)).join("\n"));
 
   if (opts.print || opts.dryRun) return; // Tier-2: just show the command
 
@@ -304,7 +289,6 @@ async function handleTask(
     return;
   }
 
-  const sandboxImage = sandboxImageOf(opts);
   if (sandboxImage && !dockerAvailable()) {
     console.error(
       chalk.red(
@@ -333,14 +317,17 @@ async function handleTask(
         output: process.stdout,
         terminal: true,
       });
+      // `&&` is invalid in Windows PowerShell 5.1 — use its separator there
+      const sep =
+        !sandboxImage && detectShell().id === "powershell" ? " ; " : " && ";
       const edited = await new Promise<string>((resolve) => {
         rl.question("", (answer) => {
           resolve(answer);
           rl.close();
         });
-        rl.write(content.replace(/\n/g, " && "));
+        rl.write(content.replace(/\n/g, sep));
       });
-      commands = edited.split(" && ").filter(Boolean);
+      commands = edited.split(sep).filter(Boolean);
       if (commands.length === 0) return;
     }
   }
@@ -359,13 +346,10 @@ function doUndo(id?: string): void {
     return;
   }
   console.log(
-    boxen(
-      `↺ Reverted snapshot ${chalk.bold(result.id)}\n` +
-        `  ${chalk.green("restored:")} ${result.restored}   ` +
-        `${chalk.yellow("removed:")} ${result.removed}   ` +
-        `${chalk.dim("skipped:")} ${result.skipped}`,
-      { padding: 1, borderStyle: "round", borderColor: "green" },
-    ),
+    chalk.green(`↺ Reverted snapshot ${chalk.bold(result.id)}`) +
+      chalk.dim(
+        ` — restored: ${result.restored} · removed: ${result.removed} · skipped: ${result.skipped}`,
+      ),
   );
 }
 
@@ -579,15 +563,8 @@ program
       );
       process.exit(1);
     }
-    console.log(
-      boxen(recipe.commands.join("\n"), {
-        padding: 1,
-        borderStyle: "round",
-        borderColor: "blue",
-        title: `recipe: ${recipe.name}`,
-        titleAlignment: "left",
-      }),
-    );
+    console.log(chalk.blue(`recipe: ${recipe.name}`));
+    console.log(recipe.commands.map((c, i) => `${i + 1}. ${c}`).join("\n"));
     const opts = program.opts<RunOpts>();
     const level = resolveTrust(opts.trust);
     if (!(await confirmExecution(recipe.commands, level))) return;

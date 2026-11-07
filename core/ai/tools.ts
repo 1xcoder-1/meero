@@ -7,6 +7,7 @@ import { execFileSync } from "child_process";
 import os from "os";
 import * as cheerio from "cheerio";
 import { withSpinner } from "../cli/ora";
+import { detectShell } from "../cli/shell";
 import ora from "ora";
 
 function resolvePath(p?: string) {
@@ -196,12 +197,13 @@ export const tools = {
   }),
 
   os: tool({
-    description: "Get OS platform and architecture",
+    description: "Get OS platform, architecture, and executing shell",
     inputSchema: z.object({}),
     execute: async () =>
       withSpinner("os", async () => ({
         platform: os.platform(),
         arch: os.arch(),
+        shell: detectShell().id,
       })),
   }),
 

@@ -1,9 +1,72 @@
 import os from "os";
+import { detectShell, type ShellInfo } from "../cli/shell";
 
 const platform = os.platform();
-const isWindows = platform === "win32";
 
-export const SYSTEM_PROMPT = `
+/**
+ * Syntax contract for the exact binary that will execute the commands.
+ * The #1 historical failure mode: cmd.exe or bash syntax reaching a
+ * PowerShell executor (e.g. `for /f`), so forbidden families are named.
+ */
+function shellRules(s: ShellInfo): string {
+  if (s.id === "pwsh" || s.id === "powershell") {
+    return [
+      "- Generate ONLY PowerShell syntax. This shell is NOT cmd.exe and NOT bash.",
+      "- NEVER generate cmd.exe syntax — it always fails here: for /f, %VAR%, dir, del, copy, set NAME=value, echo %PATH%",
+      "- NEVER generate bash/POSIX syntax: grep, find, sed, awk, ls, cat, export, source, VAR=value cmd",
+      s.id === "powershell"
+        ? "- NEVER use && or || (unsupported in Windows PowerShell 5.1) — separate commands with ;"
+        : "- && and || chain operators work",
+      "- Use curl.exe for real curl (bare curl may be aliased to Invoke-WebRequest)",
+      '- Environment variables: $env:NAME · List: Get-ChildItem · Search text: Get-ChildItem -Recurse | Select-String -Pattern "foo"',
+      "- Ports/processes: Get-NetTCPConnection, Get-Process, Stop-Process (never netstat/taskkill cmd pipelines)",
+    ].join("\n");
+  }
+  if (s.id === "cmd") {
+    return [
+      "- Generate ONLY cmd.exe syntax.",
+      "- NEVER generate PowerShell cmdlets (Get-ChildItem, $env:NAME) or bash/POSIX syntax (grep, find, export).",
+      "- Environment variables: %NAME% · List: dir · Search text: findstr",
+    ].join("\n");
+  }
+  return [
+    `- Generate ONLY POSIX (${s.id}) syntax.`,
+    "- NEVER generate PowerShell or cmd.exe syntax (Get-ChildItem, $env:NAME, for /f, %VAR%).",
+    "- Use grep, find, sed, awk as usual · Environment variables: $NAME",
+  ].join("\n");
+}
+
+/** Shell-correct examples for direct (tool-free) generic tasks */
+function shellExamples(s: ShellInfo): string {
+  if (s.id === "pwsh" || s.id === "powershell") {
+    return [
+      `"locate meero"            → ["Get-Command meero"]`,
+      `"install deps and run"    → ["bun install", "bun run dev"]`,
+      `"search text foo"         → ["Get-ChildItem -Recurse -File | Select-String -Pattern 'foo'"]`,
+      `"list all js files"       → ["Get-ChildItem -Filter *.js -Recurse"]`,
+      `"clear terminal"          → ["Clear-Host"]`,
+    ].join("\n");
+  }
+  if (s.id === "cmd") {
+    return [
+      `"locate meero"            → ["where meero"]`,
+      `"install deps and run"    → ["bun install", "bun run dev"]`,
+      `"search text foo"         → ["findstr /s /i foo *.*"]`,
+      `"list all js files"       → ["dir /s /b *.js"]`,
+      `"clear terminal"          → ["cls"]`,
+    ].join("\n");
+  }
+  return [
+    `"locate meero"            → ["which meero"]`,
+    `"install deps and run"    → ["bun install", "bun run dev"]`,
+    `"search text foo"         → ["grep -r 'foo' ."]`,
+    `"list all js files"       → ["find . -name '*.js'"]`,
+    `"clear terminal"          → ["clear"]`,
+  ].join("\n");
+}
+
+export function buildSystemPrompt(shell: ShellInfo): string {
+  return `
 You are an AI CLI planner and web-aware assistant.
 Your job is to:
 1. Understand the user's intent
@@ -13,16 +76,9 @@ Your job is to:
 ---
 ENVIRONMENT (CRITICAL)
 Target OS: ${platform} (${os.arch()})
-${
-  isWindows
-    ? `- Generate ONLY Windows commands (PowerShell or cmd.exe syntax)
-- NEVER generate grep, find, sed, awk, export, source, or bash-only syntax
-- Search files with: Get-ChildItem -Recurse | Select-String -Pattern "foo"
-- List files with: Get-ChildItem
-- Environment variables: $env:NAME`
-    : `- Generate ONLY POSIX commands (sh/bash syntax)
-- Use grep, find, sed, awk as usual`
-}
+Executing shell: ${shell.label}
+Every command is executed as: ${shell.argv("<command>").join(" ")} — no interactive shell, no profile, no aliases.
+${shellRules(shell)}
 - Commands that are not installed on this machine are failures — prefer built-ins
 
 ---
@@ -161,11 +217,7 @@ If path is provided:
 ---
 GENERIC TASKS (NO TOOLS — direct mode)
 Examples:
-"locate meero"              → ["${isWindows ? "Get-Command meero" : "which meero"}"]
-"install deps and run"    → ["bun install", "bun run dev"]
-"search text foo"         → ["${isWindows ? `Get-ChildItem -Recurse -File | Select-String -Pattern 'foo'` : "grep -r 'foo' ."}"]
-"list all js files"       → ["${isWindows ? "Get-ChildItem -Filter *.js -Recurse" : "find . -name '*.js'"}"]
-"clear terminal"          → ["clear"]
+${shellExamples(shell)}
 
 WEB TASK EXAMPLES
 "what is the react create command"
@@ -218,3 +270,7 @@ IMPORTANT
 - Deliver commands through the returnCommands tool, plain text only for questions
 - When in doubt about a command → SEARCH before answering
 `;
+}
+
+/** Default prompt: built for the shell that will actually execute commands */
+export const SYSTEM_PROMPT = buildSystemPrompt(detectShell());
