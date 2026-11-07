@@ -253,13 +253,14 @@ jobs:
             if OUT=$(npm publish --provenance 2>&1); then
               echo 'Published using Trusted Publishing (OIDC).'
             else
-              printf '::error::trusted-publishing attempt failed: %s\n' "$(printf '%s' "$OUT" | tr '\n' ' ' | head -c 700)"
+              printf '::error::trusted-publishing attempt failed: %s\n' "$(printf '%s' "$OUT" | tr '\n' ' ' | tail -c 700)"
               exit 1
             fi
           else
             echo "::notice::NPM_TOKEN is present (${#NPM_TOKEN} chars) — using token auth."
             # Any npm output could theoretically echo the credential, so redact every message.
-            redact() { printf '%s' "$1" | sed "s|${NPM_TOKEN}|[REDACTED]|g" | tr '\n' ' ' | head -c 700; }
+            # npm prints its real error at the END of output — keep the tail.
+            redact() { printf '%s' "$1" | sed "s|${NPM_TOKEN}|[REDACTED]|g" | tr '\n' ' ' | tail -c 700; }
             umask 077
             printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
             if ! WHO=$(npm whoami 2>&1); then
