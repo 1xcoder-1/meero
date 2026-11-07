@@ -40,6 +40,17 @@ const COMMANDS = `
     /builtin              pre-built command packs (no AI, auto shell detect)
     meero help            this reference outside the wizard
 
+  BUILT-INS (34 packs, zero AI — safe auto-runs, risky asks once)
+    packages    update-system, update-choco, npm-cache-clean, reinstall-node-modules, deps-install
+    network     public-ip, check-url [url], open-ports, network-info, dns-flush,
+                active-connections, speed-test, show-hosts
+    processes   kill-port [port], top-processes, kill-node
+    disk        disk-usage, large-files, clean-build, empty-trash
+    git         git-status, git-pull, git-undo-commit, git-sync, git-branches,
+                git-log-graph, git-stash
+    dev         docker-clean, docker-ps, docker-logs [container], env-info, npm-audit-fix
+    system      system-info, memory-usage
+
   WIZARD
     /settings             view + change model, provider, cheap mode
     /model [name]         switch the AI model (fetches the provider's list)
