@@ -220,66 +220,6 @@ jobs:
           name: macos-installers
           path: meero-macos-*.pkg
 
-  publish-npm:
-    name: Publish to npm
-    needs: test
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write # npm provenance via GitHub OIDC trusted publishing
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install deps
-        run: bun install
-
-      - name: Build bundle
-        run: bun run build:npm
-
-      - name: Smoke-test the bundle
-        run: node -e "const s=require('fs').readFileSync('dist/index.js','utf8'); if(!s.startsWith('#!/usr/bin/env bun')) throw new Error('shebang missing')" && bun dist/index.js --version
-
-      - name: Setup Node (npm >= 11.5 required for OIDC trusted publishing)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Publish
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN || vars.NPM_TOKEN }}
-        run: |
-          # EOTP: npm demands a one-time password for token publishes, which no
-          # CI job can answer. Primary path is therefore OIDC trusted publishing
-          # (no token, no OTP — requires the trusted publisher to be configured
-          # on npmjs.com). A stored token is only a fallback, output redacted.
-          # npm prints its real error at the END of output — keep the tail.
-          redact() {
-            if [ -n "${NPM_TOKEN:-}" ]; then
-              printf '%s' "$1" | sed "s|${NPM_TOKEN}|[REDACTED]|g" | tr '\n' ' ' | tail -c 700
-            else
-              printf '%s' "$1" | tr '\n' ' ' | tail -c 700
-            fi
-          }
-          if OUT=$(npm publish --provenance 2>&1); then
-            echo 'Published to npm via Trusted Publishing (OIDC).'
-          elif [ -n "${NPM_TOKEN:-}" ]; then
-            printf '::warning::trusted publishing did not complete — falling back to NPM_TOKEN. npm said: %s\n' "$(redact "$OUT")"
-            umask 077
-            printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
-            if OUT2=$(npm publish 2>&1); then
-              echo "Published $(node -p "require('./package.json').version") to npm with NPM_TOKEN."
-            else
-              printf '::error::npm publish with token failed: %s\n' "$(redact "$OUT2")"
-              exit 1
-            fi
-          else
-            printf '::error::npm publish failed and NPM_TOKEN is unset — configure a Trusted Publisher on npmjs.com (package meero, repo 1xcoder-1/meero, workflow release.yml). npm said: %s\n' "$(redact "$OUT")"
-            exit 1
-          fi
-
   release:
     name: Create Release
     needs: [build, brand-windows, installer-linux, installer-macos]
