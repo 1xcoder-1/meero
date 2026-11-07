@@ -110,6 +110,23 @@ describe("direct commands (run packs without the builtin word)", () => {
     expect(getBuiltinInput("test")?.id).toBe("npm-test");
   });
 
+  test("every pack has a short form — npm and friends included", () => {
+    const aliased = new Set(ALIAS_NAMES.map((a) => getBuiltinInput(a)!.id));
+    for (const c of listBuiltins()) {
+      if (c.id.includes("-")) {
+        expect(aliased.has(c.id)).toBe(true);
+      }
+    }
+    // the confusing prune name is gone; docker-clean answers to dclean
+    expect(getBuiltinInput("prune")).toBeNull();
+    expect(getBuiltinInput("dclean")?.id).toBe("docker-clean");
+    expect(getBuiltinInput("update")?.id).toBe("npm-update");
+    expect(getBuiltinInput("vuln")?.id).toBe("npm-audit");
+    expect(getBuiltinInput("health")?.id).toBe("doctor");
+    expect(getBuiltinInput("whereis")?.id).toBe("which");
+    expect(getBuiltinInput("sysupdate")?.id).toBe("update-system");
+  });
+
   test("full ids still win and stay case-insensitive", () => {
     expect(getBuiltinInput("GIT-STATUS")?.id).toBe("git-status");
     expect(getBuiltinInput("Kill-Port")?.id).toBe("kill-port");
@@ -175,7 +192,9 @@ describe("params", () => {
   test("positional values replace every {token} occurrence", () => {
     const kill = getBuiltin("kill-port")!;
     const out = fillParams(kill.variants.posix!, kill, { port: "8080" });
-    expect(out[0]).toBe("lsof -ti:8080 | xargs kill -9");
+    expect(out[0]).toBe(
+      'pids=$(lsof -ti:8080); if [ -n "$pids" ]; then echo "$pids" | xargs kill -9; echo \'port 8080 is free now\'; else echo \'nothing is listening on port 8080\'; fi',
+    );
     expect(out.join("\n")).not.toContain("{port}");
   });
 

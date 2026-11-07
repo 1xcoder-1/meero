@@ -111,7 +111,7 @@ function sandboxImageOf(opts: RunOpts): string | null {
 async function runTask(
   task: string,
   commands: string[],
-  ctx: { level: TrustLevel; sandboxImage: string | null },
+  ctx: { level: TrustLevel; sandboxImage: string | null; offerRecipe?: boolean },
 ): Promise<boolean> {
   await safetyGate(commands);
   const snapshotId = await snapshotFor(commands);
@@ -221,8 +221,13 @@ async function runTask(
         "Task stopped with failures. See `meero history`; revert file changes with `meero undo`.",
       ),
     );
-  } else if (commands.length > 1 && !ctx.sandboxImage) {
-    // proven sequence — offer to remember it
+  } else if (
+    ctx.offerRecipe !== false &&
+    commands.length > 1 &&
+    !ctx.sandboxImage
+  ) {
+    // proven sequence — offer to remember it (never for pre-built packs:
+    // they are already first-class and the prompt just stalls scripts)
     try {
       const save = await select({
         message: "Task done. Save this as a recipe for `meero run <name>`?",
@@ -459,6 +464,7 @@ async function runBuiltinPage(id?: string, args: string[] = []): Promise<void> {
   await runTask(`builtin:${cmd.id}`, commands, {
     level,
     sandboxImage: sandboxImageOf(opts),
+    offerRecipe: false,
   });
 }
 

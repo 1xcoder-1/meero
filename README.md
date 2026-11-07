@@ -15,7 +15,7 @@ An AI-powered CLI that converts natural language tasks into shell commands — i
 - **Self-Repair** — when a command fails, meero captures its real output and lets the AI fix the remaining steps (up to 3 rounds)
 - **Task History** — past sessions are remembered; `meero history` lists them
 - **Recipes** — save a proven command sequence once, replay it later without burning tokens (`meero run <name>`), and share them as files (`meero recipe export` / `import`)
-- **Pre-Built Command Packs** — 60 curated developer commands (git, docker, npm, network, disk, processes, diagnostics) that run with ZERO AI and zero cost; type the pack name directly (`meero status`, `meero kill-port 8080`) or short aliases (`meero ps`, `meero whoport`) — the right variant for your shell/OS is picked automatically, safe packs run instantly and risky ones get a single confirm (`meero builtin` for the menu)
+- **Pre-Built Command Packs** — 60 curated developer commands (git, docker, npm, network, disk, processes, diagnostics) that run with ZERO AI and zero cost; type the pack name directly (`meero status`, `meero kill-port 8080`) — and every single pack has a short form (`meero ps`, `meero health`, `meero sysupdate`, `meero vuln`) — the right variant for your shell/OS is picked automatically, safe packs run instantly and risky ones get a single confirm (`meero builtin` for the menu)
 - **Developer Guardrail** — meero is a developer tool, not a chatbot: casual one-liners ("hi", "how are you") never reach the LLM, so no tokens are wasted
 - **Trust Levels** — low / med / high per directory; high auto-runs while the safety gate stays armed
 - **Cost Transparency** — every task prints a dim line with tokens in/out and the approximate dollar cost, so the bill never surprises you
@@ -145,7 +145,7 @@ meero whoport 3000               # who is hogging the port? (EADDRINUSE fixer)
 meero doctor                     # node / npm / git / docker health check
 ```
 
-Smart auto-run: safe packs execute with no confirmation at all; risky ones (⚠️ kill, discard, prune, trash, stop) ask once. If a command still fails, the normal AI self-repair loop offers a fix.
+Smart auto-run: safe packs execute with no confirmation at all; risky ones (⚠️ kill, discard, clean, stop, trash) ask once — and they show what they touched: git-discard prints before/after status, docker-stop lists containers before and after, kill-port names the process it killed or tells you nothing was listening. Empty targets never error — they say "nothing to do" and exit clean. If a command still fails, the normal AI self-repair loop offers a fix.
 
 #### git
 | Copy-paste | Short alias | What it does |
@@ -171,21 +171,21 @@ Smart auto-run: safe packs execute with no confirmation at all; risky ones (⚠�
 #### packages
 | Copy-paste | Short alias | What it does |
 | --- | --- | --- |
-| `meero update-system` | — | update all system packages (winget/apt/brew) |
+| `meero update-system` | `meero sysupdate` | update all system packages (winget/apt/brew) |
 | `meero update-choco` | `meero choco` | update all apps via Chocolatey (windows) |
-| `meero npm-cache-clean` | — | clear the npm cache |
+| `meero npm-cache-clean` | `meero cacheclean` | clear the npm cache |
 | `meero reinstall-node-modules` | `meero reinstall` | wipe + fresh node_modules |
 | `meero deps-install` | `meero deps` | install deps per lockfile presence |
 | `meero npm-outdated` | `meero outdated` | current vs wanted vs latest versions |
-| `meero npm-update` | — | update packages to wanted versions |
+| `meero npm-update` | `meero update` | update packages to wanted versions |
 | `meero npm-ls` | `meero ls` | top-level installed packages |
 | `meero npm-scripts` | `meero scripts` | every runnable package.json script |
 | `meero npm-test` | `meero test` | run the project's tests |
 | `meero npm-ci` | `meero ci` | clean install from the lockfile |
 | `meero npm-rebuild` | `meero rebuild` | rebuild broken native modules |
-| `meero npm-audit` | — | vulnerability report without fixing |
-| `meero npm-doctor` | — | npm health check |
-| `meero npm-cache-verify` | — | verify/repair the npm cache |
+| `meero npm-audit` | `meero vuln` | vulnerability report without fixing |
+| `meero npm-doctor` | `meero npmcheck` | npm health check |
+| `meero npm-cache-verify` | `meero cachecheck` | verify/repair the npm cache |
 
 #### network
 | Copy-paste | Short alias | What it does |
@@ -217,7 +217,7 @@ Smart auto-run: safe packs execute with no confirmation at all; risky ones (⚠�
 #### dev
 | Copy-paste | Short alias | What it does |
 | --- | --- | --- |
-| `meero docker-clean` | `meero prune` | ⚠️ prune stopped containers + dangling images |
+| `meero docker-clean` | `meero dclean` | ⚠️ clean stopped containers + dangling images (lists them first) |
 | `meero docker-ps` | `meero ps` | running containers |
 | `meero docker-logs [container]` | `meero logs` | last 100 log lines of a container |
 | `meero docker-stop [container]` | `meero stop` | ⚠️ stop a container by name |
@@ -225,8 +225,8 @@ Smart auto-run: safe packs execute with no confirmation at all; risky ones (⚠�
 | `meero docker-images` | `meero images` | local image cache |
 | `meero env-info` | `meero env` | node / npm / git versions |
 | `meero npm-audit-fix` | `meero audit` | auto-fix npm vulnerabilities |
-| `meero doctor` | — | node / npm / git / docker up? disk free? |
-| `meero which [cmd]` | `meero which` | where does a command resolve ("not found" fixer) |
+| `meero doctor` | `meero health` | node / npm / git / docker up? disk free? |
+| `meero which [cmd]` | `meero whereis` | where does a command resolve ("not found" fixer) |
 | `meero who-on-port [port]` | `meero whoport` | which process holds a port (EADDRINUSE fixer) |
 
 #### system
@@ -358,7 +358,7 @@ meero/
 │   │   ├── sandbox.ts         # Docker execution
 │   │   └── wizard.ts          # chat REPL
 │   └── input.ts               # input parsing & command normalization
-├── test/                      # bun test suite (161 tests)
+├── test/                      # bun test suite (162 tests)
 ├── assets/
 │   ├── meero.png              # app icon (deb/macOS branding)
 │   └── meero.ico              # Windows icon (exe + installer branding)
@@ -377,7 +377,7 @@ meero/
 
 ```bash
 bun install
-bun test              # 161 unit tests
+bun test              # 162 unit tests
 bunx tsc --noEmit     # strict typecheck
 ```
 
