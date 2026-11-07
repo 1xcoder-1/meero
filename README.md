@@ -5,6 +5,7 @@ An AI-powered CLI that converts natural language tasks into shell commands — i
 ## Features
 
 - **Natural Language → Commands** — describe the task in plain English, no shell syntax to remember
+- **Shell-Aware** — auto-detects your exact shell (PowerShell 7, Windows PowerShell 5.1, cmd.exe, bash, zsh, sh) and generates only syntax that shell actually runs; `--sandbox` targets POSIX `sh` inside the container
 - **Multi-Provider AI** — OpenAI, Anthropic, Google Gemini, Groq, Mistral, OpenRouter and more (`meero setup`)
 - **System Inspection** — the AI reads files, git state and environment before generating anything
 - **Web Search & Docs Lookup** — the AI verifies unfamiliar commands and flags against real documentation
@@ -18,18 +19,9 @@ An AI-powered CLI that converts natural language tasks into shell commands — i
 - **Wizard Mode** — run `meero` with no arguments for a continuous chat REPL with carried context
 - **Cheap Mode** — local-first generation via Ollama with automatic escalation to cloud (`meero local on`)
 - **Sandbox** — execute commands inside a throwaway Docker container (`--sandbox`)
-- **Cost Transparency** — every task ends with tokens used and a dollar estimate
 - **Non-interactive Flags** — `--print` (commands only, never executes), `--copy` (straight to clipboard)
 
 ## Installation
-
-### Via bunx (smallest download — needs Bun only)
-
-```bash
-bunx meero commit all my changes
-```
-
-The npm package is a ~0.6 MB self-contained bundle — no 50 MB binary download, always latest. First run asks for setup.
 
 ### Quick Install (macOS / Linux)
 
