@@ -3,6 +3,7 @@ import boxen from "boxen";
 import chalk from "chalk";
 import type { ModelMessage } from "ai";
 import { isMetaRequest } from "./meta";
+import { CASUAL_REPLY, isCasualChat } from "./guardrail";
 
 export interface WizardDeps {
   /** runs one natural-language task through the full generate→confirm→execute pipeline */
@@ -15,12 +16,15 @@ export interface WizardDeps {
   runSettings?: () => Promise<void>;
   /** /model [name] — switch the active AI model */
   runModel?: (arg?: string) => Promise<void>;
+  /** /builtin — pre-built command packs, zero AI */
+  runBuiltins?: () => Promise<void>;
 }
 
 const WELCOME = `
   ✨ meero wizard — keep typing tasks; context carries between them.
 
     just text        generate + run a task
+    ${chalk.cyan("/builtin")}       pre-built commands — instant, no AI
     ${chalk.cyan("/settings")}      view + change model, provider, cheap mode
     ${chalk.cyan("/model [name]")}  switch the AI model
     ${chalk.cyan("/undo")}          revert the last task's file changes
@@ -33,6 +37,7 @@ const WELCOME = `
 const COMMANDS = `
   TASKS
     <text>                generate + run a task
+    /builtin              pre-built command packs (no AI, auto shell detect)
     meero help            this reference outside the wizard
 
   WIZARD
@@ -54,6 +59,8 @@ const COMMANDS = `
     meero recipe list|rm|export|import
     meero recipes                   alias of: meero recipe list
     meero run <name>                replay a saved recipe (no LLM)
+    meero builtin [id] [args]       pre-built dev commands — no AI
+    meero builtins                  alias of: meero builtin (menu)
     meero reset                     remove the config
 
   FLAGS (one-shot)
@@ -124,6 +131,10 @@ export async function startWizard(deps: WizardDeps): Promise<void> {
       deps.runUndo();
       continue;
     }
+    if (text === "/builtin" || text === "/builtins") {
+      await deps.runBuiltins?.();
+      continue;
+    }
     if (text.startsWith("/trust")) {
       const level = text.split(/\s+/)[1];
       if (!level || !["low", "med", "high"].includes(level)) {
@@ -136,6 +147,12 @@ export async function startWizard(deps: WizardDeps): Promise<void> {
     }
     if (text.startsWith("/")) {
       console.log(chalk.yellow(`Unknown command ${text} — see /help`));
+      continue;
+    }
+
+    // developer-tool guardrail: casual chat never reaches the LLM
+    if (isCasualChat(text)) {
+      console.log(chalk.yellow(CASUAL_REPLY));
       continue;
     }
 

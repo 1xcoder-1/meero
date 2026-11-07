@@ -5,7 +5,7 @@ import pkg from "./package.json" with { type: "json" };
 import { setup, reset } from "./core/cli/setup";
 import { generateStream } from "./core/ai/stream";
 import { normalizeCommands, parseCommands } from "./core/input";
-import { select, input } from "@inquirer/prompts";
+import { select, input, Separator } from "@inquirer/prompts";
 import boxen from "boxen";
 import { runCMDCapture } from "./core/cli/run";
 import { detectShell, SANDBOX_SHELL } from "./core/cli/shell";
@@ -43,6 +43,14 @@ import {
   listRecipes,
   saveRecipe,
 } from "./core/cli/recipes";
+import {
+  getBuiltin,
+  isBuiltinRisky,
+  listBuiltins,
+  resolveBuiltin,
+  type BuiltinCmd,
+} from "./core/cli/builtin";
+import { CASUAL_REPLY, isCasualChat } from "./core/cli/guardrail";
 import { copyToClipboard } from "./core/cli/clipboard";
 import {
   DEFAULT_SANDBOX_IMAGE,
@@ -366,6 +374,91 @@ async function handleTask(
   }
 
   await runTask(text, commands, { level, sandboxImage });
+}
+
+/**
+ * Pre-built command packs: ZERO AI for generation or execution. The
+ * variant matching the detected shell is resolved automatically, and the
+ * smart auto-run decides the gate: safe packs start immediately, risky
+ * ones (kill / prune / deletes) get one confirmation. If a command still
+ * fails, runTask's existing AI repair loop offers a fix.
+ */
+async function runBuiltinPage(id?: string, args: string[] = []): Promise<void> {
+  let cmd: BuiltinCmd | undefined;
+  if (id) {
+    cmd = getBuiltin(id) ?? undefined;
+    if (!cmd) {
+      console.error(
+        chalk.red(
+          `No built-in named "${id}" — run ${chalk.cyan("meero builtin")} for the interactive menu.`,
+        ),
+      );
+      process.exit(1);
+    }
+  } else {
+    const all = listBuiltins();
+    const choices: (Separator | { name: string; value: string; description: string })[] = [];
+    for (const group of [...new Set(all.map((c) => c.group))]) {
+      choices.push(new Separator(chalk.dim(`  ${group} `)));
+      for (const c of all.filter((x) => x.group === group))
+        choices.push({ name: `${c.label}`, value: c.id, description: c.desc });
+    }
+    let picked: string;
+    try {
+      picked = await select({
+        message: `Pre-built commands — ${detectShell().label}, no AI needed`,
+        choices,
+      });
+    } catch {
+      return; // Ctrl+C
+    }
+    cmd = getBuiltin(picked) ?? undefined;
+  }
+  if (!cmd) return;
+
+  // positional CLI args fill params in order; missing ones are prompted
+  const values: Record<string, string> = {};
+  const params = cmd.params ?? [];
+  for (let i = 0; i < params.length; i++) {
+    const p = params[i];
+    if (!p) continue;
+    const arg = args[i];
+    if (arg) values[p.token] = arg;
+    else {
+      try {
+        values[p.token] = await input({
+          message: p.message,
+          default: p.default,
+        });
+      } catch {
+        return; // Ctrl+C
+      }
+    }
+  }
+
+  const shell = detectShell();
+  const { commands, key } = resolveBuiltin(cmd, shell, values);
+  if (commands.length === 0) {
+    console.error(chalk.red(`No variant of "${cmd.id}" matches ${shell.label}.`));
+    process.exit(1);
+  }
+
+  console.log(chalk.blue(`builtin: ${cmd.label}`));
+  console.log(chalk.dim(`  shell: ${shell.label} · variant: ${key}`));
+  console.log(commands.map((c, i) => chalk.cyan(`${i + 1}. ${c}`)).join("\n"));
+
+  const opts = program.opts<RunOpts>();
+  const level = resolveTrust(opts.trust);
+  const risky = isBuiltinRisky(commands, cmd);
+  // smart auto-run: safe → straight to execution; risky → one confirm
+  if (risky && !(await confirmExecution(commands, level))) {
+    console.log(chalk.dim("Cancelled — nothing was executed."));
+    return;
+  }
+  await runTask(`builtin:${cmd.id}`, commands, {
+    level,
+    sandboxImage: sandboxImageOf(opts),
+  });
 }
 
 function doUndo(id?: string): void {
@@ -698,6 +791,22 @@ program
     });
   });
 
+program
+  .command("builtin [id] [args...]")
+  .description(
+    "Run a pre-built command pack — no AI, auto shell detect (menu when no id)",
+  )
+  .action(async (id: string | undefined, args: string[]) => {
+    await runBuiltinPage(id, args ?? []);
+  });
+
+program
+  .command("builtins")
+  .description("Alias of: meero builtin (interactive menu)")
+  .action(async () => {
+    await runBuiltinPage();
+  });
+
 program.command("help").action(async () => {
   console.log(
     boxen(
@@ -728,18 +837,23 @@ program.command("help").action(async () => {
     recipe list / recipe rm <name>
     recipes                Alias of: recipe list
     run <name>             Execute a saved recipe
+    builtin [id] [args]    Pre-built dev commands — no AI, auto shell detect
+    builtins               Alias of: builtin (interactive menu)
     reset                  Reset config to defaults
     help                   Show this help message
 
   ALWAYS ON
     safety gate · blast-radius preview · web cross-check
     self-repair · undo snapshots · cost line · shell auto-detect
-
+    pre-built packs (no AI) · chat guardrail
+  
   EXAMPLES
     ${chalk.cyan("meero")} list all running docker containers
     ${chalk.cyan("meero")} find large files over 100mb
     ${chalk.cyan("meero")} --copy kill process on port 3000
     ${chalk.cyan("meero")} --trust high compress all pngs in current folder
+    ${chalk.cyan("meero builtin")}                    interactive menu (no AI)
+    ${chalk.cyan("meero builtin kill-port 8080")}     run one pack directly
 `,
       {
         padding: 0.1,
@@ -769,6 +883,7 @@ program.action(async (input: string[]) => {
       },
       runSettings: () => runSettingsPage(),
       runModel: (arg) => runModelPage(arg),
+      runBuiltins: () => runBuiltinPage(),
     });
     return;
   }
@@ -777,6 +892,12 @@ program.action(async (input: string[]) => {
     console.log(
       "That looks like a meero config request — run: meero setup · meero model",
     );
+    return;
+  }
+
+  // developer-tool guardrail: casual chat never reaches the LLM
+  if (isCasualChat(text)) {
+    console.log(chalk.yellow(CASUAL_REPLY));
     return;
   }
 

@@ -15,6 +15,8 @@ An AI-powered CLI that converts natural language tasks into shell commands — i
 - **Self-Repair** — when a command fails, meero captures its real output and lets the AI fix the remaining steps (up to 3 rounds)
 - **Task History** — past sessions are remembered; `meero history` lists them
 - **Recipes** — save a proven command sequence once, replay it later without burning tokens (`meero run <name>`), and share them as files (`meero recipe export` / `import`)
+- **Pre-Built Command Packs** — 34 curated developer commands (git, docker, npm, network, disk, processes) that run with ZERO AI and zero cost; the right variant for your shell/OS is picked automatically, safe packs run instantly and risky ones get a single confirm (`meero builtin`)
+- **Developer Guardrail** — meero is a developer tool, not a chatbot: casual one-liners ("hi", "how are you") never reach the LLM, so no tokens are wasted
 - **Trust Levels** — low / med / high per directory; high auto-runs while the safety gate stays armed
 - **Cost Transparency** — every task prints a dim line with tokens in/out and the approximate dollar cost, so the bill never surprises you
 - **Wizard Mode** — run `meero` with no arguments for a continuous chat REPL with carried context, real-time streaming replies, and built-in pages: `/settings` (model, provider, cheap mode), `/model [name]`, `/commands`
@@ -114,7 +116,7 @@ The workflow:
 meero
 ```
 
-A continuous REPL — context carries between tasks. Slash commands: `/undo`, `/trust low|med|high`, `/help`, `/exit`.
+A continuous REPL — context carries between tasks. Slash commands: `/builtin` (pre-built packs, no AI), `/undo`, `/trust low|med|high`, `/help`, `/exit`.
 
 ### Recipes
 
@@ -129,6 +131,31 @@ meero recipe export x.json deploy   # …or only the named ones
 meero recipe import team.json       # merge them in (name clashes are skipped)
 meero recipe import team.json --force  # overwrite same-named recipes
 ```
+
+### Pre-Built Command Packs (No AI)
+
+34 curated developer commands that need no API key and make no LLM call — select one and the correct variant for your detected shell/OS runs immediately:
+
+```bash
+meero builtin                    # interactive grouped menu (auto shell detect)
+meero builtin git-status         # run one pack directly by id
+meero builtin kill-port 8080     # packs with params take args (else prompted)
+meero builtins                   # alias of: meero builtin (menu)
+```
+
+Smart auto-run: safe packs execute with no confirmation at all; risky ones (kill, prune, trash) ask once. If a command still fails, the normal AI self-repair loop offers a fix.
+
+| Group | Packs |
+| --- | --- |
+| packages | `update-system` (winget/apt/brew) · `update-choco` · `npm-cache-clean` · `reinstall-node-modules` · `deps-install` |
+| network | `public-ip` · `check-url [url]` · `open-ports` · `network-info` · `dns-flush` · `active-connections` · `speed-test` · `show-hosts` |
+| processes | `kill-port [port]` · `top-processes` · `kill-node` |
+| disk | `disk-usage` · `large-files` · `clean-build` · `empty-trash` |
+| git | `git-status` · `git-pull` · `git-undo-commit` · `git-sync` · `git-branches` · `git-log-graph` · `git-stash` |
+| dev | `docker-clean` · `docker-ps` · `docker-logs [container]` · `env-info` · `npm-audit-fix` |
+| system | `system-info` · `memory-usage` |
+
+Platform-aware by design: every pack ships variants for PowerShell / cmd / bash / zsh / sh (plus Windows, Linux, macOS specifics), and meero picks the one that matches the shell that will actually execute it — the same detection that powers AI generation.
 
 ### Trust Levels
 
@@ -245,11 +272,13 @@ meero/
 │   │   ├── repair.ts          # AI self-repair prompt builder
 │   │   ├── trust.ts           # trust levels + confirmations
 │   │   ├── recipes.ts         # saved command sequences
+│   │   ├── builtin.ts         # 34 pre-built command packs (no AI, auto shell detect)
+│   │   ├── guardrail.ts       # casual-chat guardrail (no tokens wasted)
 │   │   ├── clipboard.ts       # cross-platform copy
 │   │   ├── sandbox.ts         # Docker execution
 │   │   └── wizard.ts          # chat REPL
 │   └── input.ts               # input parsing & command normalization
-├── test/                      # bun test suite (112 tests)
+├── test/                      # bun test suite (157 tests)
 ├── assets/
 │   ├── meero.png              # app icon (deb/macOS branding)
 │   └── meero.ico              # Windows icon (exe + installer branding)
@@ -268,7 +297,7 @@ meero/
 
 ```bash
 bun install
-bun test              # 112 unit tests
+bun test              # 157 unit tests
 bunx tsc --noEmit     # strict typecheck
 ```
 
