@@ -91,9 +91,9 @@ export function showTrust(cwd = process.cwd()): {
 }
 
 /**
- * Pre-execution confirmation at a trust level (used by recipe runs and the
- * wizard). `low` adds PER-COMMAND confirmation inside runTask — the task
- * level still gets this single gate.
+ * Pre-execution confirmation at a trust level (used by recipe runs and
+ * pre-built packs). `low` adds PER-COMMAND confirmation inside runTask —
+ * the task level still gets this single gate.
  */
 export async function confirmExecution(
   commands: string[],

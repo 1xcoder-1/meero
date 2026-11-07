@@ -51,20 +51,22 @@ import {
   resolveBuiltin,
   type BuiltinCmd,
 } from "./core/cli/builtin";
-import { CASUAL_REPLY, isCasualChat } from "./core/cli/guardrail";
+import {
+  CASUAL_REPLY,
+  isCasualChat,
+  stripMeeroPrefix,
+} from "./core/cli/guardrail";
 import { copyToClipboard } from "./core/cli/clipboard";
 import {
   DEFAULT_SANDBOX_IMAGE,
   dockerAvailable,
   runSandboxed,
 } from "./core/cli/sandbox";
-import { startWizard } from "./core/cli/wizard";
 import { ollamaAvailable } from "./core/ai/providers";
 import { changeModel, loadConfig, overwriteConfig } from "./core/cli/config";
 import { fetchModels } from "./core/ai/models";
 import { isMetaRequest } from "./core/cli/meta";
 import { formatUsage } from "./core/ai/usage";
-import type { ModelMessage } from "ai";
 import chalk from "chalk";
 import readline from "readline";
 
@@ -261,12 +263,8 @@ async function runTask(
   return completed;
 }
 
-/** Full pipeline for one natural-language task (used by CLI and wizard) */
-async function handleTask(
-  text: string,
-  opts: RunOpts,
-  session?: ModelMessage[],
-): Promise<void> {
+/** Full pipeline for one natural-language task (CLI one-shot) */
+async function handleTask(text: string, opts: RunOpts): Promise<void> {
   const sandboxImage = sandboxImageOf(opts);
 
   // chat replies stream to the terminal as they generate; JSON/fenced
@@ -286,7 +284,6 @@ async function handleTask(
   };
 
   const gen = await generateStream(text, {
-    history: session,
     preferLocal: opts.local,
     onText,
     // inside docker the executor is POSIX sh, whatever the host is
@@ -296,13 +293,6 @@ async function handleTask(
 
   const parsed = parseCommands(gen.text ?? "");
   const normalized = normalizeCommands(parsed);
-
-  if (session) {
-    session.push(
-      { role: "user", content: text },
-      { role: "assistant", content: gen.text ?? "[]" },
-    );
-  }
 
   const content = normalized.join("\n");
   if (!content) {
@@ -597,6 +587,13 @@ program.command("model").action(async () => {
   await changeModel();
 });
 
+program
+  .command("settings")
+  .description("View + change model, provider, cheap mode")
+  .action(async () => {
+    await runSettingsPage();
+  });
+
 program.command("reset").action(async () => {
   reset();
 });
@@ -814,15 +811,15 @@ program
     await runBuiltinPage();
   });
 
-program.command("help").action(async () => {
+function printHelp(): void {
   console.log(
     boxen(
       `
   ✨ meero — AI-powered CLI assistant
 
   USAGE
-    ${chalk.cyan("meero")} "your task"        Generate and run shell commands
-    ${chalk.cyan("meero")}                    Wizard: conversational loop, kept context
+    ${chalk.cyan("meero")} "your task"        Generate and run shell commands (AI)
+    ${chalk.cyan("meero")}                    this help — meero has no chat mode
     ${chalk.cyan("meero")} <command>          Run a specific command
 
   FLAGS
@@ -835,6 +832,7 @@ program.command("help").action(async () => {
   COMMANDS
     setup                  Configure your API key and model
     model                  Switch the active model
+    settings               Model, provider and cheap mode in one page
     undo                   Revert files changed by the last task
     undo --list            List undo snapshots
     history                Recent tasks and their outcomes
@@ -875,34 +873,16 @@ program.command("help").action(async () => {
       },
     ),
   );
-});
+}
 
 program.action(async (input: string[]) => {
-  const text = (input ?? []).join(" ").trim();
   const opts = program.opts<RunOpts>();
 
+  // a typed/quoted "meero" prefix is noise ("meero hi") — strip it so the
+  // chat guardrail sees the real words; nothing left means help, not chat
+  const text = stripMeeroPrefix((input ?? []).join(" ").trim());
   if (!text) {
-    // Tier-2 wizard REPL: conversational loop with carried context
-    let sessionTrust: TrustLevel | undefined;
-    await startWizard({
-      handleTask: async (t, session) => {
-        await handleTask(t, { ...opts, trust: sessionTrust ?? opts.trust }, session);
-      },
-      runUndo: () => doUndo(),
-      setSessionTrust: (level) => {
-        sessionTrust = level as TrustLevel;
-      },
-      runSettings: () => runSettingsPage(),
-      runModel: (arg) => runModelPage(arg),
-      runBuiltins: () => runBuiltinPage(),
-      tryBuiltin: async (t) => {
-        const parts = t.split(/\s+/);
-        const direct = getBuiltinInput(parts[0] ?? "");
-        if (!direct) return false;
-        await runBuiltinPage(direct.id, parts.slice(1));
-        return true;
-      },
-    });
+    printHelp(); // no task given — and there is no chat mode to fall into
     return;
   }
 

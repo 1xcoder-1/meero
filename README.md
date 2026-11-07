@@ -16,10 +16,10 @@ An AI-powered CLI that converts natural language tasks into shell commands — i
 - **Task History** — past sessions are remembered; `meero history` lists them
 - **Recipes** — save a proven command sequence once, replay it later without burning tokens (`meero run <name>`), and share them as files (`meero recipe export` / `import`)
 - **Pre-Built Command Packs** — 60 curated developer commands (git, docker, npm, network, disk, processes, diagnostics) that run with ZERO AI and zero cost; type the pack name directly (`meero status`, `meero kill-port 8080`) — and every single pack has a short form (`meero ps`, `meero health`, `meero sysupdate`, `meero vuln`) — the right variant for your shell/OS is picked automatically, safe packs run instantly and risky ones get a single confirm (`meero builtin` for the menu)
-- **Developer Guardrail** — meero is a developer tool, not a chatbot: casual one-liners ("hi", "how are you") never reach the LLM, so no tokens are wasted
+- **Developer Guardrail** — meero is a developer tool, not a chatbot: casual one-liners ("hi", "how are you" — even typo-prefixed like `meero hi`) never reach the LLM, and when AI *is* used it is locked to shell commands — it can never chat back
 - **Trust Levels** — low / med / high per directory; high auto-runs while the safety gate stays armed
 - **Cost Transparency** — every task prints a dim line with tokens in/out and the approximate dollar cost, so the bill never surprises you
-- **Wizard Mode** — run `meero` with no arguments for a continuous chat REPL with carried context, real-time streaming replies, and built-in pages: `/settings` (model, provider, cheap mode), `/model [name]`, `/commands`
+- **No Chat Mode** — running `meero` with no task prints the help box; AI is only ever invoked for a real developer task (`meero commit all my changes`), and settings live in real commands: `meero settings`, `meero model`, `meero trust`
 - **Cheap Mode** — local-first generation via Ollama with automatic escalation to cloud (`meero local on`)
 - **Sandbox** — execute commands inside a throwaway Docker container (`--sandbox`)
 - **Non-interactive Flags** — `--print` (commands only, never executes), `--copy` (straight to clipboard)
@@ -110,13 +110,14 @@ The workflow:
 5. Commands execute sequentially; if one fails, the AI gets the real output and repairs the rest
 6. Destructive targets are snapshotted first, so `meero undo` can bring them back
 
-### Wizard Mode
+### No Task, No Chat
 
 ```bash
-meero
+meero          # prints the help box — there is no chat mode
+meero hi       # refused before any AI call — meero is a tool, not a chatbot
 ```
 
-A continuous REPL — context carries between tasks. Slash commands: `/builtin` (pre-built packs, no AI), `/undo`, `/trust low|med|high`, `/help`, `/exit`.
+AI runs only for a real developer task: `meero commit all my changes`, `meero what command shows disk usage`. Even then the model is contract-bound to return shell commands — small talk comes back as nothing, and it may not touch its tools for it.
 
 ### Recipes
 
@@ -353,12 +354,11 @@ meero/
 │   │   ├── trust.ts           # trust levels + confirmations
 │   │   ├── recipes.ts         # saved command sequences
 │   │   ├── builtin.ts         # 60 pre-built command packs (no AI, auto shell detect)
-│   │   ├── guardrail.ts       # casual-chat guardrail (no tokens wasted)
+│   │   ├── guardrail.ts       # casual-chat guardrail + meero-prefix strip
 │   │   ├── clipboard.ts       # cross-platform copy
-│   │   ├── sandbox.ts         # Docker execution
-│   │   └── wizard.ts          # chat REPL
+│   │   └── sandbox.ts         # Docker execution
 │   └── input.ts               # input parsing & command normalization
-├── test/                      # bun test suite (162 tests)
+├── test/                      # bun test suite (167 tests)
 ├── assets/
 │   ├── meero.png              # app icon (deb/macOS branding)
 │   └── meero.ico              # Windows icon (exe + installer branding)
