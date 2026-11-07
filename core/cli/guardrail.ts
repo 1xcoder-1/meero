@@ -5,6 +5,20 @@
  * with developer intent (tools, files, commands) always passes through.
  */
 
+/**
+ * Users repeat the CLI name inside the task ("meero hi", `meero "meero hi"`)
+ * — and that prefix slipped past the anchored patterns below straight into
+ * the LLM. Strip every leading "meero"/"miro" token before classifying.
+ */
+export function stripMeeroPrefix(text: string): string {
+  let t = text.trim();
+  for (;;) {
+    const next = t.replace(/^(?:meero|miro)(?:\s+|$)/i, "");
+    if (next === t) return t;
+    t = next.trim();
+  }
+}
+
 const DEV_HINT = new RegExp(
   "\\b(" +
     [

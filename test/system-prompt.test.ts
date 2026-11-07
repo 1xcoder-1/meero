@@ -81,4 +81,13 @@ describe("system prompt shell contract", () => {
       expect(p).toContain("NEVER generate install commands");
     }
   });
+
+  test("prompt locks the AI out of chat: small talk → empty commands, never prose or tools", () => {
+    const p = buildSystemPrompt(fakeShell("pwsh"));
+    expect(p).toContain("NOT a chatbot. You NEVER chat.");
+    expect(p).toContain(
+      "call returnCommands({ commands: [] }) — NEVER reply with prose and NEVER",
+    );
+    expect(p).toContain("call any tool (readFile, webSearch, ...)");
+  });
 });
