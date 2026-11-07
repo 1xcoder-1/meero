@@ -45,17 +45,14 @@ import {
 } from "./core/cli/recipes";
 import {
   getBuiltin,
-  getBuiltinInput,
   isBuiltinRisky,
   listBuiltins,
   resolveBuiltin,
   type BuiltinCmd,
 } from "./core/cli/builtin";
-import {
-  CASUAL_REPLY,
-  isCasualChat,
-  stripMeeroPrefix,
-} from "./core/cli/guardrail";
+import { CASUAL_REPLY, stripMeeroPrefix } from "./core/cli/guardrail";
+import { routeInput } from "./core/cli/router";
+import { buildCommandsReference, SLASH_COMMANDS } from "./core/cli/reference";
 import { copyToClipboard } from "./core/cli/clipboard";
 import {
   DEFAULT_SANDBOX_IMAGE,
@@ -65,7 +62,6 @@ import {
 import { ollamaAvailable } from "./core/ai/providers";
 import { changeModel, loadConfig, overwriteConfig } from "./core/cli/config";
 import { fetchModels } from "./core/ai/models";
-import { isMetaRequest } from "./core/cli/meta";
 import { formatUsage } from "./core/ai/usage";
 import chalk from "chalk";
 import readline from "readline";
@@ -567,6 +563,86 @@ async function runSettingsPage(): Promise<void> {
   }
 }
 
+/** Shared by `meero undo` and `meero /undo` */
+function runUndoCommand(id?: string, list = false): void {
+  if (list) {
+    const snaps = listSnapshots();
+    if (snaps.length === 0) return console.log("No snapshots yet.");
+    for (const s of snaps) {
+      console.log(
+        `${chalk.cyan(s.id)}  ${new Date(s.ts).toLocaleString()}  ${chalk.dim(
+          `${s.entries.length} file(s)  ${s.commands[0] ?? ""}`,
+        )}`,
+      );
+    }
+    return;
+  }
+  doUndo(id);
+}
+
+/** Shared by `meero trust` and `meero /trust` */
+function runTrustCommand(level?: string, here?: boolean): void {
+  if (!level) {
+    const t = showTrust();
+    console.log(
+      `trust = ${chalk.bold(t.effective)} (${t.scope} default) — change with: meero trust low|med|high${here ? " --here" : ""}`,
+    );
+    return;
+  }
+  if (!isTrustLevel(level)) {
+    console.error(chalk.red(`Invalid trust level "${level}" — use low, med or high`));
+    process.exit(1);
+  }
+  setTrust(level, here ? process.cwd() : undefined);
+  console.log(
+    `Trust set to ${chalk.bold(level)} ${here ? `for ${process.cwd()}` : "globally"}.`,
+  );
+}
+
+/**
+ * `meero /xyz` — every local command answers in slash form too. Routed
+ * BEFORE anything else, so a command that exists here can never fall through
+ * to the model.
+ */
+async function runSlash(name: string, rest: string[]): Promise<void> {
+  switch (name) {
+    case "settings":
+      await runSettingsPage();
+      return;
+    case "model":
+      await runModelPage(rest[0]);
+      return;
+    case "builtin":
+    case "builtins":
+      await runBuiltinPage();
+      return;
+    case "undo":
+      runUndoCommand(rest.includes("--list") ? undefined : rest[0], rest.includes("--list"));
+      return;
+    case "trust":
+      runTrustCommand(rest[0], rest.includes("--here"));
+      return;
+    case "commands":
+      printCommands();
+      return;
+    case "help":
+      printHelp();
+      return;
+    case "exit":
+    case "quit":
+      console.log(
+        chalk.dim("Nothing to exit — meero runs one task per call. See: meero help"),
+      );
+      return;
+    default:
+      console.log(
+        chalk.yellow(
+          `Unknown command /${name} — slash form works for: ${SLASH_COMMANDS.map((c) => c.name).join(" ")}`,
+        ),
+      );
+  }
+}
+
 program
   .name("meero")
   .description("Natural language → shell commands, run right in this terminal")
@@ -604,19 +680,7 @@ program
   .argument("[id]", "snapshot id (default: most recent)")
   .option("--list", "list available snapshots")
   .action((id: string | undefined, opts: { list?: boolean }) => {
-    if (opts.list) {
-      const snaps = listSnapshots();
-      if (snaps.length === 0) return console.log("No snapshots yet.");
-      for (const s of snaps) {
-        console.log(
-          `${chalk.cyan(s.id)}  ${new Date(s.ts).toLocaleString()}  ${chalk.dim(
-            `${s.entries.length} file(s)  ${s.commands[0] ?? ""}`,
-          )}`,
-        );
-      }
-      return;
-    }
-    doUndo(id);
+    runUndoCommand(id, opts.list);
   });
 
 program
@@ -654,21 +718,7 @@ program
   .argument("[level]", "low | med | high (omit to show current)")
   .option("--here", "apply to the current directory only")
   .action((level: string | undefined, opts: { here?: boolean }) => {
-    if (!level) {
-      const t = showTrust();
-      console.log(
-        `trust = ${chalk.bold(t.effective)} (${t.scope} default) — change with: meero trust low|med|high${opts.here ? " --here" : ""}`,
-      );
-      return;
-    }
-    if (!isTrustLevel(level)) {
-      console.error(chalk.red(`Invalid trust level "${level}" — use low, med or high`));
-      process.exit(1);
-    }
-    setTrust(level, opts.here ? process.cwd() : undefined);
-    console.log(
-      `Trust set to ${chalk.bold(level)} ${opts.here ? `for ${process.cwd()}` : "globally"}.`,
-    );
+    runTrustCommand(level, opts.here);
   });
 
 program
@@ -811,6 +861,17 @@ program
     await runBuiltinPage();
   });
 
+program
+  .command("commands")
+  .description("Full reference: every command, flag and pre-built pack")
+  .action(() => {
+    printCommands();
+  });
+
+function printCommands(): void {
+  console.log(buildCommandsReference());
+}
+
 function printHelp(): void {
   console.log(
     boxen(
@@ -819,8 +880,9 @@ function printHelp(): void {
 
   USAGE
     ${chalk.cyan("meero")} "your task"        Generate and run shell commands (AI)
+    ${chalk.cyan("meero")} <pack> [args]      Run a pre-built pack — no AI
+    ${chalk.cyan("meero")} /<command>         Slash form of every command below
     ${chalk.cyan("meero")}                    this help — meero has no chat mode
-    ${chalk.cyan("meero")} <command>          Run a specific command
 
   FLAGS
     --print / --dry-run      Generate only; show, never execute
@@ -844,10 +906,14 @@ function printHelp(): void {
     run <name>             Execute a saved recipe
     builtin [id] [args]    Pre-built pack menu — no AI, auto shell detect
     builtins               Alias of: builtin (interactive menu)
+    commands               Full reference: every command, flag and pack
     <pack>                 60 packs run directly, no AI: meero status,
                            meero kill-port 8080, meero doctor, meero ps
     reset                  Reset config to defaults
     help                   Show this help message
+
+  SLASH FORM (same commands, no AI call)
+    meero /settings  /model  /builtin  /undo  /trust  /commands  /help  /exit
 
   ALWAYS ON
     safety gate · blast-radius preview · web cross-check
@@ -863,6 +929,7 @@ function printHelp(): void {
     ${chalk.cyan("meero status")}                     run git-status instantly (no AI)
     ${chalk.cyan("meero kill-port 8080")}             run one pack directly
     ${chalk.cyan("meero whoport 3000")}               who is hogging the port (no AI)
+    ${chalk.cyan("meero /settings")}                  slash commands work the same
 `,
       {
         padding: 0.1,
@@ -878,36 +945,49 @@ function printHelp(): void {
 program.action(async (input: string[]) => {
   const opts = program.opts<RunOpts>();
 
-  // a typed/quoted "meero" prefix is noise ("meero hi") — strip it so the
-  // chat guardrail sees the real words; nothing left means help, not chat
-  const text = stripMeeroPrefix((input ?? []).join(" ").trim());
-  if (!text) {
-    printHelp(); // no task given — and there is no chat mode to fall into
-    return;
+  // one decision point, in the order users expect: slash command → built-in
+  // pack → meero-config question → chat guardrail → only then the AI
+  const route = routeInput((input ?? []).join(" "));
+  switch (route.kind) {
+    case "help":
+      printHelp(); // no task given — and there is no chat mode to fall into
+      return;
+    case "slash":
+      await runSlash(route.name, route.rest);
+      return;
+    case "pack":
+      // direct pack: "meero status 3000" runs a built-in — zero AI, zero cost
+      await runBuiltinPage(route.id, route.rest);
+      return;
+    case "meta":
+      console.log(
+        "That looks like a meero config request — run: meero setup · meero settings · meero model",
+      );
+      return;
+    case "chat":
+      // developer-tool guardrail: casual chat never reaches the LLM
+      console.log(chalk.yellow(CASUAL_REPLY));
+      return;
+    case "ai":
+      await handleTask(route.text, opts);
+      return;
   }
-
-  // direct pack: "meero status 3000" runs a built-in — zero AI, zero cost
-  const parts = text.split(/\s+/);
-  const direct = getBuiltinInput(parts[0] ?? "");
-  if (direct) {
-    await runBuiltinPage(direct.id, parts.slice(1));
-    return;
-  }
-
-  if (isMetaRequest(text)) {
-    console.log(
-      "That looks like a meero config request — run: meero setup · meero model",
-    );
-    return;
-  }
-
-  // developer-tool guardrail: casual chat never reaches the LLM
-  if (isCasualChat(text)) {
-    console.log(chalk.yellow(CASUAL_REPLY));
-    return;
-  }
-
-  await handleTask(text, opts);
 });
 
-program.parse();
+/**
+ * Slash invocations are resolved from raw argv BEFORE commander parses options:
+ * `meero /undo --list` carries a flag that only the `undo` subcommand knows,
+ * so at the root level commander would abort with "unknown option" before any
+ * handler ran. A leading global flag (`meero --print /help`) is left to
+ * commander, and the router's slash case still catches it there.
+ */
+const rawArgv = process.argv.slice(2);
+const rawParts = stripMeeroPrefix(rawArgv.join(" ")).split(/\s+/).filter(Boolean);
+const slashEarly = rawParts[0]?.startsWith("/") === true && !rawArgv[0]?.startsWith("-");
+
+if (slashEarly) {
+  const head = rawParts[0]!;
+  await runSlash(head.slice(1).toLowerCase(), rawParts.slice(1));
+} else {
+  program.parse();
+}
