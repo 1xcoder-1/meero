@@ -16,6 +16,7 @@ An AI-powered CLI that converts natural language tasks into shell commands — i
 - **Task History** — past sessions are remembered; `meero history` lists them
 - **Recipes** — save a proven command sequence once, replay it later without burning tokens (`meero run <name>`), and share them as files (`meero recipe export` / `import`)
 - **Trust Levels** — low / med / high per directory; high auto-runs while the safety gate stays armed
+- **Cost Transparency** — every task prints a dim line with tokens in/out and the approximate dollar cost, so the bill never surprises you
 - **Wizard Mode** — run `meero` with no arguments for a continuous chat REPL with carried context, real-time streaming replies, and built-in pages: `/settings` (model, provider, cheap mode), `/model [name]`, `/commands`
 - **Cheap Mode** — local-first generation via Ollama with automatic escalation to cloud (`meero local on`)
 - **Sandbox** — execute commands inside a throwaway Docker container (`--sandbox`)

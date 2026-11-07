@@ -33,25 +33,44 @@ const WELCOME = `
 const COMMANDS = `
   TASKS
     <text>                generate + run a task
-    meero help            CLI flags & commands (outside the wizard)
+    meero help            this reference outside the wizard
 
   WIZARD
     /settings             view + change model, provider, cheap mode
     /model [name]         switch the AI model (fetches the provider's list)
     /undo                 revert the last task's file changes
     /trust low|med|high   confirmation strictness (this session)
+    /commands             this reference
+    /help                 quick cheat sheet
     /exit                 leave
 
   CLI
-    meero setup           configure provider + API key + model
-    meero model           switch the active model
-    meero undo [id|--list]
-    meero history [--clear]
-    meero trust [level] [--here]
-    meero local on|off|status        (Ollama cheap mode)
+    meero setup                     configure provider + API key + model
+    meero model                     switch the active model
+    meero undo [id|--list]          restore files changed by the last task
+    meero history [--clear]         past tasks + outcomes
+    meero trust [level] [--here]    strictness per directory (low|med|high)
+    meero local on|off|status       Ollama cheap mode
     meero recipe list|rm|export|import
-    meero run <name>      replay a saved recipe
-    meero reset           remove the config
+    meero recipes                   alias of: meero recipe list
+    meero run <name>                replay a saved recipe (no LLM)
+    meero reset                     remove the config
+
+  FLAGS (one-shot)
+    --print | --dry-run   show commands, never execute
+    --copy                copy commands to clipboard
+    --trust <level>       strictness for this run only
+    --local               prefer the local Ollama model for this task
+    --sandbox [image]     run inside a throwaway docker container
+
+  ALWAYS ON (no command needed)
+    safety gate           dangerous commands stop at a red box — type "confirm"
+    blast-radius preview  shows which files change + sizes before running
+    web cross-check       the gate pulls real docs for risky commands
+    self-repair           a failed command's output goes back to the AI (3 rounds)
+    snapshots + undo      every mutating task is revertible via meero undo
+    cost line             tokens + approximate $ printed after each task
+    shell auto-detect     PowerShell 7 / 5.1 / cmd / bash / zsh / sh
 `;
 
 export async function startWizard(deps: WizardDeps): Promise<void> {

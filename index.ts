@@ -54,6 +54,7 @@ import { ollamaAvailable } from "./core/ai/providers";
 import { changeModel, loadConfig, overwriteConfig } from "./core/cli/config";
 import { fetchModels } from "./core/ai/models";
 import { isMetaRequest } from "./core/cli/meta";
+import { formatUsage } from "./core/ai/usage";
 import type { ModelMessage } from "ai";
 import chalk from "chalk";
 import readline from "readline";
@@ -292,14 +293,18 @@ async function handleTask(
   const content = normalized.join("\n");
   if (!content) {
     // a chat reply already streamed live — only print it if nothing streamed
-    if (gen.text && gen.text.trim() && !streamedAny)
-      console.log(gen.text.trim());
-    else if (!gen.text || !gen.text.trim())
+    if (gen.text && gen.text.trim()) {
+      if (!streamedAny) console.log(gen.text.trim());
+      console.log(chalk.dim(`  ${formatUsage(gen.usage, gen.modelUsed)}`));
+    } else {
       console.log(chalk.red("No commands generated — try being more specific."));
+    }
     return;
   }
 
   console.log(normalized.map((c, i) => chalk.cyan(`${i + 1}. ${c}`)).join("\n"));
+  // cost line — tokens + approximate $, printed with every task
+  console.log(chalk.dim(`  ${formatUsage(gen.usage, gen.modelUsed)}`));
 
   if (opts.print || opts.dryRun) return; // Tier-2: just show the command
 
@@ -721,9 +726,14 @@ program.command("help").action(async () => {
     trust [level] [--here] Confirmation strictness (per dir supported)
     local on|off|status    Ollama cheap mode routing
     recipe list / recipe rm <name>
+    recipes                Alias of: recipe list
     run <name>             Execute a saved recipe
     reset                  Reset config to defaults
     help                   Show this help message
+
+  ALWAYS ON
+    safety gate · blast-radius preview · web cross-check
+    self-repair · undo snapshots · cost line · shell auto-detect
 
   EXAMPLES
     ${chalk.cyan("meero")} list all running docker containers
