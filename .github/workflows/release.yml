@@ -242,36 +242,42 @@ jobs:
       - name: Smoke-test the bundle
         run: node -e "const s=require('fs').readFileSync('dist/index.js','utf8'); if(!s.startsWith('#!/usr/bin/env bun')) throw new Error('shebang missing')" && bun dist/index.js --version
 
+      - name: Setup Node (npm >= 11.5 required for OIDC trusted publishing)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Publish
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN || vars.NPM_TOKEN }}
         run: |
-          # Failures are echoed as annotations so they are readable without log access.
-          # The token value is never printed; npm's own output is redacted defensively.
-          if [ -z "${NPM_TOKEN:-}" ]; then
-            echo '::notice::NPM_TOKEN is EMPTY in this job (secrets.NPM_TOKEN and vars.NPM_TOKEN both unset for this scope). Values stored under an Environment reach only jobs that declare that environment.'
-            if OUT=$(npm publish --provenance 2>&1); then
-              echo 'Published using Trusted Publishing (OIDC).'
+          # EOTP: npm demands a one-time password for token publishes, which no
+          # CI job can answer. Primary path is therefore OIDC trusted publishing
+          # (no token, no OTP — requires the trusted publisher to be configured
+          # on npmjs.com). A stored token is only a fallback, output redacted.
+          # npm prints its real error at the END of output — keep the tail.
+          redact() {
+            if [ -n "${NPM_TOKEN:-}" ]; then
+              printf '%s' "$1" | sed "s|${NPM_TOKEN}|[REDACTED]|g" | tr '\n' ' ' | tail -c 700
             else
-              printf '::error::trusted-publishing attempt failed: %s\n' "$(printf '%s' "$OUT" | tr '\n' ' ' | tail -c 700)"
+              printf '%s' "$1" | tr '\n' ' ' | tail -c 700
+            fi
+          }
+          if OUT=$(npm publish --provenance 2>&1); then
+            echo 'Published to npm via Trusted Publishing (OIDC).'
+          elif [ -n "${NPM_TOKEN:-}" ]; then
+            printf '::warning::trusted publishing did not complete — falling back to NPM_TOKEN. npm said: %s\n' "$(redact "$OUT")"
+            umask 077
+            printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
+            if OUT2=$(npm publish 2>&1); then
+              echo "Published $(node -p "require('./package.json').version") to npm with NPM_TOKEN."
+            else
+              printf '::error::npm publish with token failed: %s\n' "$(redact "$OUT2")"
               exit 1
             fi
           else
-            echo "::notice::NPM_TOKEN is present (${#NPM_TOKEN} chars) — using token auth."
-            # Any npm output could theoretically echo the credential, so redact every message.
-            # npm prints its real error at the END of output — keep the tail.
-            redact() { printf '%s' "$1" | sed "s|${NPM_TOKEN}|[REDACTED]|g" | tr '\n' ' ' | tail -c 700; }
-            umask 077
-            printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
-            if ! WHO=$(npm whoami 2>&1); then
-              printf '::warning::npm whoami rejected the token (invalid/expired, 2FA not bypassed, or missing publish scope): %s\n' "$(redact "$WHO")"
-            fi
-            if OUT=$(npm publish 2>&1); then
-              echo "Published $(node -p "require('./package.json').version") to npm."
-            else
-              printf '::error::npm publish failed: %s\n' "$(redact "$OUT")"
-              exit 1
-            fi
+            printf '::error::npm publish failed and NPM_TOKEN is unset — configure a Trusted Publisher on npmjs.com (package meero, repo 1xcoder-1/meero, workflow release.yml). npm said: %s\n' "$(redact "$OUT")"
+            exit 1
           fi
 
   release:
