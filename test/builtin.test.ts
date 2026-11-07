@@ -1,8 +1,10 @@
 import { expect, test, describe } from "bun:test";
 import os from "os";
 import {
+  ALIAS_NAMES,
   fillParams,
   getBuiltin,
+  getBuiltinInput,
   isBuiltinRisky,
   listBuiltins,
   resolveBuiltin,
@@ -42,10 +44,10 @@ function entry(variants: BuiltinCmd["variants"]): BuiltinCmd {
 }
 
 describe("builtins catalog", () => {
-  test("ships 30-40 packs with unique ids and full metadata", () => {
+  test("ships 55-70 packs with unique ids and full metadata", () => {
     const all = listBuiltins();
-    expect(all.length).toBeGreaterThanOrEqual(30);
-    expect(all.length).toBeLessThanOrEqual(40);
+    expect(all.length).toBeGreaterThanOrEqual(55);
+    expect(all.length).toBeLessThanOrEqual(70);
     expect(new Set(all.map((c) => c.id)).size).toBe(all.length);
     for (const c of all) {
       expect(c.label.length).toBeGreaterThan(0);
@@ -79,6 +81,44 @@ describe("builtins catalog", () => {
   test("getBuiltin is case-insensitive and misses cleanly", () => {
     expect(getBuiltin("KILL-PORT")?.id).toBe("kill-port");
     expect(getBuiltin("nope")).toBeNull();
+  });
+});
+
+describe("direct commands (run packs without the builtin word)", () => {
+  /** meero's own registered commands — aliases must never shadow these */
+  const RESERVED = [
+    "setup", "model", "reset", "undo", "history", "trust", "local",
+    "recipe", "recipes", "run", "builtin", "builtins", "help", "version",
+  ];
+
+  test("aliases are unique and never shadow pack ids or meero commands", () => {
+    const all = listBuiltins();
+    const ids = new Set(all.map((c) => c.id));
+    const inputs = new Set([...ids, ...RESERVED]);
+    for (const alias of ALIAS_NAMES) {
+      expect(inputs.has(alias)).toBe(false);
+      inputs.add(alias);
+    }
+  });
+
+  test("aliases resolve to the right pack", () => {
+    expect(getBuiltinInput("status")?.id).toBe("git-status");
+    expect(getBuiltinInput("ps")?.id).toBe("docker-ps");
+    expect(getBuiltinInput("killport")?.id).toBe("kill-port");
+    expect(getBuiltinInput("choco")?.id).toBe("update-choco");
+    expect(getBuiltinInput("whoport")?.id).toBe("who-on-port");
+    expect(getBuiltinInput("test")?.id).toBe("npm-test");
+  });
+
+  test("full ids still win and stay case-insensitive", () => {
+    expect(getBuiltinInput("GIT-STATUS")?.id).toBe("git-status");
+    expect(getBuiltinInput("Kill-Port")?.id).toBe("kill-port");
+  });
+
+  test("non-commands (even casual words) miss cleanly — AI path keeps working", () => {
+    expect(getBuiltinInput("nope")).toBeNull();
+    expect(getBuiltinInput("hi")).toBeNull();
+    expect(getBuiltinInput("")).toBeNull();
   });
 });
 

@@ -15,7 +15,7 @@ An AI-powered CLI that converts natural language tasks into shell commands — i
 - **Self-Repair** — when a command fails, meero captures its real output and lets the AI fix the remaining steps (up to 3 rounds)
 - **Task History** — past sessions are remembered; `meero history` lists them
 - **Recipes** — save a proven command sequence once, replay it later without burning tokens (`meero run <name>`), and share them as files (`meero recipe export` / `import`)
-- **Pre-Built Command Packs** — 34 curated developer commands (git, docker, npm, network, disk, processes) that run with ZERO AI and zero cost; the right variant for your shell/OS is picked automatically, safe packs run instantly and risky ones get a single confirm (`meero builtin`)
+- **Pre-Built Command Packs** — 60 curated developer commands (git, docker, npm, network, disk, processes, diagnostics) that run with ZERO AI and zero cost; type the pack name directly (`meero status`, `meero kill-port 8080`) or short aliases (`meero ps`, `meero whoport`) — the right variant for your shell/OS is picked automatically, safe packs run instantly and risky ones get a single confirm (`meero builtin` for the menu)
 - **Developer Guardrail** — meero is a developer tool, not a chatbot: casual one-liners ("hi", "how are you") never reach the LLM, so no tokens are wasted
 - **Trust Levels** — low / med / high per directory; high auto-runs while the safety gate stays armed
 - **Cost Transparency** — every task prints a dim line with tokens in/out and the approximate dollar cost, so the bill never surprises you
@@ -134,26 +134,106 @@ meero recipe import team.json --force  # overwrite same-named recipes
 
 ### Pre-Built Command Packs (No AI)
 
-34 curated developer commands that need no API key and make no LLM call — select one and the correct variant for your detected shell/OS runs immediately:
+60 curated developer commands that need no API key and make no LLM call — run any pack **directly by name** (the `builtin` word is optional) and the correct variant for your detected shell/OS executes immediately:
 
 ```bash
 meero builtin                    # interactive grouped menu (auto shell detect)
-meero builtin git-status         # run one pack directly by id
-meero builtin kill-port 8080     # packs with params take args (else prompted)
-meero builtins                   # alias of: meero builtin (menu)
+meero status                     # short alias → runs git-status
+meero git-status                 # full id — same thing, also works
+meero kill-port 8080             # packs with params take args (else prompted)
+meero whoport 3000               # who is hogging the port? (EADDRINUSE fixer)
+meero doctor                     # node / npm / git / docker health check
 ```
 
-Smart auto-run: safe packs execute with no confirmation at all; risky ones (kill, prune, trash) ask once. If a command still fails, the normal AI self-repair loop offers a fix.
+Smart auto-run: safe packs execute with no confirmation at all; risky ones (⚠️ kill, discard, prune, trash, stop) ask once. If a command still fails, the normal AI self-repair loop offers a fix.
 
-| Group | Packs |
-| --- | --- |
-| packages | `update-system` (winget/apt/brew) · `update-choco` · `npm-cache-clean` · `reinstall-node-modules` · `deps-install` |
-| network | `public-ip` · `check-url [url]` · `open-ports` · `network-info` · `dns-flush` · `active-connections` · `speed-test` · `show-hosts` |
-| processes | `kill-port [port]` · `top-processes` · `kill-node` |
-| disk | `disk-usage` · `large-files` · `clean-build` · `empty-trash` |
-| git | `git-status` · `git-pull` · `git-undo-commit` · `git-sync` · `git-branches` · `git-log-graph` · `git-stash` |
-| dev | `docker-clean` · `docker-ps` · `docker-logs [container]` · `env-info` · `npm-audit-fix` |
-| system | `system-info` · `memory-usage` |
+#### git
+| Copy-paste | Short alias | What it does |
+| --- | --- | --- |
+| `meero git-status` | `meero status` | branch status + last 5 commits |
+| `meero git-pull` | `meero pull` | rebase pull with autostash |
+| `meero git-undo-commit` | `meero uncommit` | undo the last commit, keep the changes |
+| `meero git-sync` | `meero sync` | fetch all remotes with prune + status |
+| `meero git-branches` | `meero branches` | all local + remote branches |
+| `meero git-log-graph` | `meero graph` | commit graph, last 15 |
+| `meero git-stash` | `meero stash` | stash everything incl. untracked |
+| `meero git-diff` | `meero diff` | uncommitted changes (stat + full diff) |
+| `meero git-last` | `meero last` | last commit in detail |
+| `meero git-remote` | `meero remote` | remotes with URLs |
+| `meero git-add-all` | `meero add` | stage every change |
+| `meero git-unstage` | `meero unstage` | unstage everything, keep edits |
+| `meero git-discard [file]` | `meero discard` | ⚠️ back to the last committed version |
+| `meero git-blame [file]` | `meero blame` | line-by-line authorship |
+| `meero git-tag-list` | `meero tags` | tags, newest first |
+| `meero git-authors` | `meero authors` | top contributors |
+| `meero git-amend` | `meero amend` | add staged changes to the last commit |
+
+#### packages
+| Copy-paste | Short alias | What it does |
+| --- | --- | --- |
+| `meero update-system` | — | update all system packages (winget/apt/brew) |
+| `meero update-choco` | `meero choco` | update all apps via Chocolatey (windows) |
+| `meero npm-cache-clean` | — | clear the npm cache |
+| `meero reinstall-node-modules` | `meero reinstall` | wipe + fresh node_modules |
+| `meero deps-install` | `meero deps` | install deps per lockfile presence |
+| `meero npm-outdated` | `meero outdated` | current vs wanted vs latest versions |
+| `meero npm-update` | — | update packages to wanted versions |
+| `meero npm-ls` | `meero ls` | top-level installed packages |
+| `meero npm-scripts` | `meero scripts` | every runnable package.json script |
+| `meero npm-test` | `meero test` | run the project's tests |
+| `meero npm-ci` | `meero ci` | clean install from the lockfile |
+| `meero npm-rebuild` | `meero rebuild` | rebuild broken native modules |
+| `meero npm-audit` | — | vulnerability report without fixing |
+| `meero npm-doctor` | — | npm health check |
+| `meero npm-cache-verify` | — | verify/repair the npm cache |
+
+#### network
+| Copy-paste | Short alias | What it does |
+| --- | --- | --- |
+| `meero public-ip` | `meero ip` | your public IPv4/IPv6 |
+| `meero check-url [url]` | `meero check` | status code + timing of a URL |
+| `meero open-ports` | `meero ports` | listening ports and their owners |
+| `meero network-info` | `meero net` | adapters, IPs, gateways, DNS |
+| `meero dns-flush` | `meero dns` | flush the DNS cache |
+| `meero active-connections` | `meero conns` | active TCP connections |
+| `meero speed-test` | `meero speedtest` | download speed via Cloudflare |
+| `meero show-hosts` | `meero hosts` | show the hosts file |
+
+#### processes
+| Copy-paste | Short alias | What it does |
+| --- | --- | --- |
+| `meero kill-port [port]` | `meero killport` | ⚠️ kill whatever listens on a port |
+| `meero top-processes` | `meero top` | heaviest processes by CPU/memory |
+| `meero kill-node` | `meero killnode` | ⚠️ kill all node processes |
+
+#### disk
+| Copy-paste | Short alias | What it does |
+| --- | --- | --- |
+| `meero disk-usage` | `meero disk` | disk space per drive/mount |
+| `meero large-files` | `meero largest` | biggest files under the current folder |
+| `meero clean-build` | `meero cleanbuild` | delete dist/build/.next artifacts |
+| `meero empty-trash` | `meero trash` | ⚠️ empty the recycle bin / trash |
+
+#### dev
+| Copy-paste | Short alias | What it does |
+| --- | --- | --- |
+| `meero docker-clean` | `meero prune` | ⚠️ prune stopped containers + dangling images |
+| `meero docker-ps` | `meero ps` | running containers |
+| `meero docker-logs [container]` | `meero logs` | last 100 log lines of a container |
+| `meero docker-stop [container]` | `meero stop` | ⚠️ stop a container by name |
+| `meero docker-restart [container]` | `meero restart` | restart a container by name |
+| `meero docker-images` | `meero images` | local image cache |
+| `meero env-info` | `meero env` | node / npm / git versions |
+| `meero npm-audit-fix` | `meero audit` | auto-fix npm vulnerabilities |
+| `meero doctor` | — | node / npm / git / docker up? disk free? |
+| `meero which [cmd]` | `meero which` | where does a command resolve ("not found" fixer) |
+| `meero who-on-port [port]` | `meero whoport` | which process holds a port (EADDRINUSE fixer) |
+
+#### system
+| Copy-paste | Short alias | What it does |
+| --- | --- | --- |
+| `meero system-info` | `meero sysinfo` | OS, CPU, uptime summary |
+| `meero memory-usage` | `meero mem` | total vs free memory |
 
 Platform-aware by design: every pack ships variants for PowerShell / cmd / bash / zsh / sh (plus Windows, Linux, macOS specifics), and meero picks the one that matches the shell that will actually execute it — the same detection that powers AI generation.
 
@@ -272,13 +352,13 @@ meero/
 │   │   ├── repair.ts          # AI self-repair prompt builder
 │   │   ├── trust.ts           # trust levels + confirmations
 │   │   ├── recipes.ts         # saved command sequences
-│   │   ├── builtin.ts         # 34 pre-built command packs (no AI, auto shell detect)
+│   │   ├── builtin.ts         # 60 pre-built command packs (no AI, auto shell detect)
 │   │   ├── guardrail.ts       # casual-chat guardrail (no tokens wasted)
 │   │   ├── clipboard.ts       # cross-platform copy
 │   │   ├── sandbox.ts         # Docker execution
 │   │   └── wizard.ts          # chat REPL
 │   └── input.ts               # input parsing & command normalization
-├── test/                      # bun test suite (157 tests)
+├── test/                      # bun test suite (161 tests)
 ├── assets/
 │   ├── meero.png              # app icon (deb/macOS branding)
 │   └── meero.ico              # Windows icon (exe + installer branding)
@@ -297,7 +377,7 @@ meero/
 
 ```bash
 bun install
-bun test              # 157 unit tests
+bun test              # 161 unit tests
 bunx tsc --noEmit     # strict typecheck
 ```
 

@@ -456,6 +456,252 @@ export const BUILTINS: BuiltinCmd[] = [
       macos: ["vm_stat | head -n 8"],
     },
   },
+
+  // ---- git (third wave) ------------------------------------------------------
+  {
+    id: "git-diff",
+    label: "Show uncommitted changes",
+    group: "git",
+    desc: "what you changed and the actual diff",
+    variants: {
+      any: ["git --no-pager diff --stat", "git --no-pager diff"],
+    },
+  },
+  {
+    id: "git-last",
+    label: "Show the last commit in detail",
+    group: "git",
+    desc: "message + files of HEAD",
+    variants: { any: ["git --no-pager show --stat HEAD"] },
+  },
+  {
+    id: "git-remote",
+    label: "List git remotes",
+    group: "git",
+    desc: "where this repo pushes and pulls from",
+    variants: { any: ["git remote -v"] },
+  },
+  {
+    id: "git-add-all",
+    label: "Stage every change",
+    group: "git",
+    desc: "git add -A + resulting status",
+    variants: { any: ["git add -A", "git status -sb"] },
+  },
+  {
+    id: "git-unstage",
+    label: "Unstage everything",
+    group: "git",
+    desc: "keep the edits, clear the staging area",
+    variants: { any: ["git reset", "git status -sb"] },
+  },
+  {
+    id: "git-discard",
+    label: "Discard local changes to a file",
+    group: "git",
+    desc: "back to the last committed version (destructive)",
+    risky: true,
+    params: [
+      { token: "file", message: "File to discard (. = all):", default: "." },
+    ],
+    variants: { any: ["git checkout -- {file}"] },
+  },
+  {
+    id: "git-blame",
+    label: "Who wrote this file's lines",
+    group: "git",
+    desc: "line-by-line authorship",
+    params: [
+      { token: "file", message: "File to blame:", default: "package.json" },
+    ],
+    variants: { any: ["git --no-pager blame {file}"] },
+  },
+  {
+    id: "git-tag-list",
+    label: "List tags (newest first)",
+    group: "git",
+    desc: "release tags of this repo",
+    variants: { any: ["git --no-pager tag --sort=-creatordate"] },
+  },
+  {
+    id: "git-authors",
+    label: "Top contributors",
+    group: "git",
+    desc: "commits per author",
+    variants: { any: ["git shortlog -sn HEAD"] },
+  },
+  {
+    id: "git-amend",
+    label: "Add staged changes to the last commit",
+    group: "git",
+    desc: "amend without editing the message",
+    variants: { any: ["git commit --amend --no-edit"] },
+  },
+
+  // ---- npm (third wave) ------------------------------------------------------
+  {
+    id: "npm-outdated",
+    label: "List outdated packages",
+    group: "packages",
+    desc: "current vs wanted vs latest versions",
+    variants: { any: ["npm outdated"] },
+  },
+  {
+    id: "npm-update",
+    label: "Update packages to wanted versions",
+    group: "packages",
+    desc: "respects semver ranges in package.json",
+    variants: { any: ["npm update"] },
+  },
+  {
+    id: "npm-ls",
+    label: "List installed packages",
+    group: "packages",
+    desc: "top level of the dependency tree",
+    variants: { any: ["npm ls --depth=0"] },
+  },
+  {
+    id: "npm-scripts",
+    label: "List package.json scripts",
+    group: "packages",
+    desc: "every runnable script of this project",
+    variants: { any: ["npm run"] },
+  },
+  {
+    id: "npm-test",
+    label: "Run the project's tests",
+    group: "packages",
+    desc: "npm test in this folder",
+    variants: { any: ["npm test"] },
+  },
+  {
+    id: "npm-ci",
+    label: "Clean install from the lockfile",
+    group: "packages",
+    desc: "exact CI-grade dependency install",
+    variants: { any: ["npm ci"] },
+  },
+  {
+    id: "npm-rebuild",
+    label: "Rebuild native modules",
+    group: "packages",
+    desc: "fixes broken node-gyp builds",
+    variants: { any: ["npm rebuild"] },
+  },
+  {
+    id: "npm-audit",
+    label: "Show the vulnerability report",
+    group: "packages",
+    desc: "npm audit without fixing",
+    variants: { any: ["npm audit"] },
+  },
+  {
+    id: "npm-doctor",
+    label: "Check npm's health",
+    group: "packages",
+    desc: "ping, registry, versions, permissions",
+    variants: { any: ["npm doctor"] },
+  },
+  {
+    id: "npm-cache-verify",
+    label: "Verify the npm cache",
+    group: "packages",
+    desc: "repairs corrupt cache entries",
+    variants: { any: ["npm cache verify"] },
+  },
+
+  // ---- docker (extras) -------------------------------------------------------
+  {
+    id: "docker-stop",
+    label: "Stop a container",
+    group: "dev",
+    desc: "graceful stop by name",
+    risky: true,
+    params: [
+      { token: "container", message: "Container name:", default: "app" },
+    ],
+    variants: { any: ["docker stop {container}"] },
+  },
+  {
+    id: "docker-restart",
+    label: "Restart a container",
+    group: "dev",
+    desc: "stop + start by name",
+    params: [
+      { token: "container", message: "Container name:", default: "app" },
+    ],
+    variants: { any: ["docker restart {container}"] },
+  },
+  {
+    id: "docker-images",
+    label: "List docker images",
+    group: "dev",
+    desc: "what is in the local image cache",
+    variants: { any: ["docker images"] },
+  },
+
+  // ---- dev-mistake diagnostics ------------------------------------------------
+  {
+    id: "doctor",
+    label: "Developer environment health check",
+    group: "dev",
+    desc: "node / npm / git / docker up? disk free?",
+    variants: {
+      windows: [
+        "node --version",
+        "npm --version",
+        "git --version",
+        "docker ps --format \"{{.Names}}: {{.Status}}\"",
+        "wmic logicaldisk get caption,freespace",
+      ],
+      linux: [
+        "uname -r",
+        "node --version",
+        "npm --version",
+        "git --version",
+        "docker ps --format '{{.Names}}: {{.Status}}'",
+        "df -h / | tail -1",
+      ],
+      macos: [
+        "sw_vers",
+        "node --version",
+        "npm --version",
+        "git --version",
+        "docker ps --format '{{.Names}}: {{.Status}}'",
+        "df -h / | tail -1",
+      ],
+    },
+  },
+  {
+    id: "which",
+    label: "Where does a command resolve from",
+    group: "dev",
+    desc: "the 'command not found' investigator",
+    params: [{ token: "cmd", message: "Command to locate:", default: "node" }],
+    variants: {
+      powershell: [
+        "Get-Command {cmd} | Select-Object CommandType,Name,Source | Format-List",
+      ],
+      cmd: ["where {cmd}"],
+      posix: ["which -a {cmd}"],
+    },
+  },
+  {
+    id: "who-on-port",
+    label: "Which process is listening on a port",
+    group: "dev",
+    desc: "the EADDRINUSE investigator",
+    params: [{ token: "port", message: "Port number:", default: "3000" }],
+    variants: {
+      powershell: [
+        "Get-NetTCPConnection -LocalPort {port} -State Listen | Select-Object LocalAddress,LocalPort,OwningProcess | Format-Table -AutoSize",
+        "$pids = (Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue).OwningProcess; if ($pids) { Get-Process -Id $pids | Select-Object Id,ProcessName,Path | Format-List }",
+      ],
+      cmd: ["netstat -ano | findstr :{port} | findstr LISTENING"],
+      linux: ["ss -ltnp | grep :{port} || true"],
+      macos: ["lsof -nP -i :{port} -s TCP:LISTEN"],
+    },
+  },
 ];
 
 export function listBuiltins(): BuiltinCmd[] {
@@ -467,6 +713,81 @@ export function listBuiltins(): BuiltinCmd[] {
 
 export function getBuiltin(id: string): BuiltinCmd | null {
   return BUILTINS.find((c) => c.id === id.toLowerCase()) ?? null;
+}
+
+/**
+ * Short aliases: `meero status` runs git-status, `meero ps` runs docker-ps.
+ * Full ids always keep working; aliases are sugar for the common ones and are
+ * kept collision-free with meero's own commands (enforced by tests).
+ */
+const ID_ALIASES: Record<string, string> = {
+  // git
+  status: "git-status",
+  pull: "git-pull",
+  uncommit: "git-undo-commit",
+  sync: "git-sync",
+  branches: "git-branches",
+  graph: "git-log-graph",
+  stash: "git-stash",
+  diff: "git-diff",
+  last: "git-last",
+  remote: "git-remote",
+  add: "git-add-all",
+  unstage: "git-unstage",
+  discard: "git-discard",
+  blame: "git-blame",
+  tags: "git-tag-list",
+  authors: "git-authors",
+  amend: "git-amend",
+  // docker
+  ps: "docker-ps",
+  logs: "docker-logs",
+  prune: "docker-clean",
+  stop: "docker-stop",
+  restart: "docker-restart",
+  images: "docker-images",
+  // dev / npm
+  env: "env-info",
+  audit: "npm-audit-fix",
+  outdated: "npm-outdated",
+  rebuild: "npm-rebuild",
+  ls: "npm-ls",
+  scripts: "npm-scripts",
+  ci: "npm-ci",
+  test: "npm-test",
+  reinstall: "reinstall-node-modules",
+  deps: "deps-install",
+  // network
+  ip: "public-ip",
+  check: "check-url",
+  ports: "open-ports",
+  net: "network-info",
+  dns: "dns-flush",
+  conns: "active-connections",
+  speedtest: "speed-test",
+  hosts: "show-hosts",
+  // processes / disk / system
+  killport: "kill-port",
+  top: "top-processes",
+  killnode: "kill-node",
+  disk: "disk-usage",
+  largest: "large-files",
+  cleanbuild: "clean-build",
+  trash: "empty-trash",
+  sysinfo: "system-info",
+  mem: "memory-usage",
+  choco: "update-choco",
+  // diagnostics
+  whoport: "who-on-port",
+};
+
+/** Every registered short alias (used by tests to prove collision-free UX) */
+export const ALIAS_NAMES = Object.keys(ID_ALIASES);
+
+/** Resolve a typed word to a pack: full id first, then the short alias map */
+export function getBuiltinInput(word: string): BuiltinCmd | null {
+  const w = word.toLowerCase();
+  return getBuiltin(w) ?? getBuiltin(ID_ALIASES[w] ?? "");
 }
 
 /** Family aliases tried when the exact shell id has no variant */
