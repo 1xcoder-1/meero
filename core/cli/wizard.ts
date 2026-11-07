@@ -18,6 +18,8 @@ export interface WizardDeps {
   runModel?: (arg?: string) => Promise<void>;
   /** /builtin — pre-built command packs, zero AI */
   runBuiltins?: () => Promise<void>;
+  /** direct pack input: "status 3000" → runs the pack, returns true (no AI) */
+  tryBuiltin?: (text: string) => Promise<boolean>;
 }
 
 const WELCOME = `
@@ -40,15 +42,26 @@ const COMMANDS = `
     /builtin              pre-built command packs (no AI, auto shell detect)
     meero help            this reference outside the wizard
 
-  BUILT-INS (34 packs, zero AI — safe auto-runs, risky asks once)
-    packages    update-system, update-choco, npm-cache-clean, reinstall-node-modules, deps-install
+  BUILT-INS (60 packs, zero AI — run directly, no "builtin" word needed)
+    meero status  (= git-status)   meero ps  (= docker-ps)
+    meero killport 8080            meero whoport 3000   meero doctor
+    every pack also answers to its full id: meero git-status, meero docker-ps
+
+    git         git-status, git-pull, git-undo-commit, git-sync, git-branches,
+                git-log-graph, git-stash, git-diff, git-last, git-remote,
+                git-add-all, git-unstage, git-discard [file], git-blame [file],
+                git-tag-list, git-authors, git-amend
+    packages    update-system, update-choco, npm-cache-clean,
+                reinstall-node-modules, deps-install, npm-outdated, npm-update,
+                npm-ls, npm-scripts, npm-test, npm-ci, npm-rebuild, npm-audit,
+                npm-doctor, npm-cache-verify
     network     public-ip, check-url [url], open-ports, network-info, dns-flush,
                 active-connections, speed-test, show-hosts
     processes   kill-port [port], top-processes, kill-node
     disk        disk-usage, large-files, clean-build, empty-trash
-    git         git-status, git-pull, git-undo-commit, git-sync, git-branches,
-                git-log-graph, git-stash
-    dev         docker-clean, docker-ps, docker-logs [container], env-info, npm-audit-fix
+    dev         docker-clean, docker-ps, docker-logs [container], docker-stop
+                [container], docker-restart [container], docker-images,
+                env-info, npm-audit-fix, doctor, which [cmd], who-on-port [port]
     system      system-info, memory-usage
 
   WIZARD
@@ -146,6 +159,9 @@ export async function startWizard(deps: WizardDeps): Promise<void> {
       await deps.runBuiltins?.();
       continue;
     }
+
+    // direct pack: "status 3000" runs a built-in — zero AI, zero cost
+    if (await deps.tryBuiltin?.(text)) continue;
     if (text.startsWith("/trust")) {
       const level = text.split(/\s+/)[1];
       if (!level || !["low", "med", "high"].includes(level)) {

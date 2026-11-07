@@ -45,6 +45,7 @@ import {
 } from "./core/cli/recipes";
 import {
   getBuiltin,
+  getBuiltinInput,
   isBuiltinRisky,
   listBuiltins,
   resolveBuiltin,
@@ -837,8 +838,10 @@ program.command("help").action(async () => {
     recipe list / recipe rm <name>
     recipes                Alias of: recipe list
     run <name>             Execute a saved recipe
-    builtin [id] [args]    Pre-built dev commands — no AI, auto shell detect
+    builtin [id] [args]    Pre-built pack menu — no AI, auto shell detect
     builtins               Alias of: builtin (interactive menu)
+    <pack>                 60 packs run directly, no AI: meero status,
+                           meero kill-port 8080, meero doctor, meero ps
     reset                  Reset config to defaults
     help                   Show this help message
 
@@ -853,7 +856,9 @@ program.command("help").action(async () => {
     ${chalk.cyan("meero")} --copy kill process on port 3000
     ${chalk.cyan("meero")} --trust high compress all pngs in current folder
     ${chalk.cyan("meero builtin")}                    interactive menu (no AI)
-    ${chalk.cyan("meero builtin kill-port 8080")}     run one pack directly
+    ${chalk.cyan("meero status")}                     run git-status instantly (no AI)
+    ${chalk.cyan("meero kill-port 8080")}             run one pack directly
+    ${chalk.cyan("meero whoport 3000")}               who is hogging the port (no AI)
 `,
       {
         padding: 0.1,
@@ -884,7 +889,22 @@ program.action(async (input: string[]) => {
       runSettings: () => runSettingsPage(),
       runModel: (arg) => runModelPage(arg),
       runBuiltins: () => runBuiltinPage(),
+      tryBuiltin: async (t) => {
+        const parts = t.split(/\s+/);
+        const direct = getBuiltinInput(parts[0] ?? "");
+        if (!direct) return false;
+        await runBuiltinPage(direct.id, parts.slice(1));
+        return true;
+      },
     });
+    return;
+  }
+
+  // direct pack: "meero status 3000" runs a built-in — zero AI, zero cost
+  const parts = text.split(/\s+/);
+  const direct = getBuiltinInput(parts[0] ?? "");
+  if (direct) {
+    await runBuiltinPage(direct.id, parts.slice(1));
     return;
   }
 
