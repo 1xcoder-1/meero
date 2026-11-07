@@ -174,12 +174,14 @@ export const BUILTINS: BuiltinCmd[] = [
     params: [{ token: "port", message: "Port number:", default: "3000" }],
     variants: {
       powershell: [
-        "Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }",
+        "$c = Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue; if (-not $c) { Write-Host 'nothing is listening on port {port}' } else { $c | Select-Object LocalAddress,LocalPort,OwningProcess | Format-Table -AutoSize; $c | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }; Write-Host 'port {port} is free now' }",
       ],
       cmd: [
-        "for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :{port} ^| findstr LISTENING') do taskkill /F /PID %a",
+        "for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :{port} ^| findstr LISTENING') do taskkill /F /PID %a 2>nul",
       ],
-      posix: ["lsof -ti:{port} | xargs kill -9"],
+      posix: [
+        "pids=$(lsof -ti:{port}); if [ -n \"$pids\" ]; then echo \"$pids\" | xargs kill -9; echo 'port {port} is free now'; else echo 'nothing is listening on port {port}'; fi",
+      ],
     },
   },
   {
@@ -259,7 +261,12 @@ export const BUILTINS: BuiltinCmd[] = [
     group: "dev",
     desc: "stopped containers, dangling layers",
     risky: true,
-    variants: { any: ["docker system prune -f"] },
+    variants: {
+      any: [
+        "docker ps -a --format \"{{.Names}}: {{.Status}}\"",
+        "docker system prune -f",
+      ],
+    },
   },
 
   // ---- system --------------------------------------------------------------
@@ -353,10 +360,12 @@ export const BUILTINS: BuiltinCmd[] = [
     risky: true,
     variants: {
       powershell: [
-        "Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force",
+        "$p = Get-Process node -ErrorAction SilentlyContinue; if ($p) { $p | Select-Object Id,ProcessName | Format-Table -AutoSize; $p | Stop-Process -Force; Write-Host \"killed $($p.Count) node process(es)\" } else { Write-Host 'no node processes running' }",
       ],
-      cmd: ["taskkill /F /IM node.exe"],
-      posix: ["pkill -9 node || true"],
+      cmd: ["taskkill /F /IM node.exe 2>nul & echo node processes stopped (if any)"],
+      posix: [
+        "pkill -9 node 2>/dev/null; echo 'node processes stopped (if any)'",
+      ],
     },
   },
 
@@ -386,15 +395,16 @@ export const BUILTINS: BuiltinCmd[] = [
     risky: true,
     variants: {
       powershell: [
-        "Clear-RecycleBin -Force -ErrorAction SilentlyContinue",
+        "$items = (New-Object -ComObject Shell.Application).NameSpace(0xA).Items(); Write-Host \"recycle bin: $($items.Count) item(s)\"; Clear-RecycleBin -Force -ErrorAction SilentlyContinue; Write-Host 'recycle bin emptied'",
       ],
       cmd: [
-        "powershell -NoProfile -Command \"Clear-RecycleBin -Force -ErrorAction SilentlyContinue\"",
+        "powershell -NoProfile -Command \"Clear-RecycleBin -Force -ErrorAction SilentlyContinue; Write-Host 'recycle bin emptied'\"",
       ],
-      macos: ["rm -rf ~/.Trash/*"],
+      macos: ["rm -rf ~/.Trash/*", "echo 'trash emptied'"],
       linux: [
         "rm -rf ~/.local/share/Trash/files/*",
         "rm -rf ~/.local/share/Trash/info/*",
+        "echo 'trash emptied'",
       ],
     },
   },
@@ -504,7 +514,9 @@ export const BUILTINS: BuiltinCmd[] = [
     params: [
       { token: "file", message: "File to discard (. = all):", default: "." },
     ],
-    variants: { any: ["git checkout -- {file}"] },
+    variants: {
+      any: ["git status -sb", "git checkout -- {file}", "git status -sb"],
+    },
   },
   {
     id: "git-blame",
@@ -620,7 +632,13 @@ export const BUILTINS: BuiltinCmd[] = [
     params: [
       { token: "container", message: "Container name:", default: "app" },
     ],
-    variants: { any: ["docker stop {container}"] },
+    variants: {
+      any: [
+        "docker ps --format \"{{.Names}}: {{.Status}}\"",
+        "docker stop {container}",
+        "docker ps --format \"{{.Names}}: {{.Status}}\"",
+      ],
+    },
   },
   {
     id: "docker-restart",
@@ -742,7 +760,7 @@ const ID_ALIASES: Record<string, string> = {
   // docker
   ps: "docker-ps",
   logs: "docker-logs",
-  prune: "docker-clean",
+  dclean: "docker-clean",
   stop: "docker-stop",
   restart: "docker-restart",
   images: "docker-images",
@@ -750,13 +768,19 @@ const ID_ALIASES: Record<string, string> = {
   env: "env-info",
   audit: "npm-audit-fix",
   outdated: "npm-outdated",
+  update: "npm-update",
   rebuild: "npm-rebuild",
   ls: "npm-ls",
   scripts: "npm-scripts",
   ci: "npm-ci",
   test: "npm-test",
+  vuln: "npm-audit",
+  npmcheck: "npm-doctor",
+  cacheclean: "npm-cache-clean",
+  cachecheck: "npm-cache-verify",
   reinstall: "reinstall-node-modules",
   deps: "deps-install",
+  sysupdate: "update-system",
   // network
   ip: "public-ip",
   check: "check-url",
@@ -779,6 +803,8 @@ const ID_ALIASES: Record<string, string> = {
   choco: "update-choco",
   // diagnostics
   whoport: "who-on-port",
+  health: "doctor",
+  whereis: "which",
 };
 
 /** Every registered short alias (used by tests to prove collision-free UX) */
