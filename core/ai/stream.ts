@@ -18,6 +18,8 @@ export interface GenerateOpts {
   preferLocal?: boolean;
   /** override the default system prompt (e.g. sandbox = POSIX sh inside docker) */
   systemPrompt?: string;
+  /** live callback — chat replies stream word-by-word as they generate */
+  onText?: (delta: string) => void;
 }
 
 /**
@@ -35,7 +37,7 @@ export async function generateStream(
   if (wantLocal) {
     if (await ollamaAvailable()) {
       const lm = localModel || "llama3.1";
-      const res = await runLLM(getOllamaModel(lm), prompt, opts.history, opts.systemPrompt);
+      const res = await runLLM(getOllamaModel(lm), prompt, opts.history, opts.systemPrompt, opts.onText);
       const usable = res.text !== null && parseCommands(res.text).length > 0;
       if (usable) {
         console.log(chalk.dim(`  ⚡ served locally (ollama/${lm})`));
@@ -55,7 +57,7 @@ export async function generateStream(
     }
   }
 
-  const res = await runLLM(getModel(provider, apiKey, model), prompt, opts.history, opts.systemPrompt);
+  const res = await runLLM(getModel(provider, apiKey, model), prompt, opts.history, opts.systemPrompt, opts.onText);
   return { ...res, modelUsed: model, usedLocal: false };
 }
 

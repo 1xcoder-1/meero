@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, rmSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "fs";
 import { homedir } from "os";
 import { select, password, confirm } from "@inquirer/prompts";
 import { fetchModels } from "../ai/models";
@@ -47,9 +47,13 @@ export async function setup() {
       mkdirSync(configDir, { recursive: true });
     }
 
+    // preserve keys setup does not manage (localEnabled, localModel)
+    const prev = existsSync(configPath)
+      ? JSON.parse(readFileSync(configPath, "utf-8"))
+      : {};
     writeFileSync(
       configPath,
-      JSON.stringify({ provider, apiKey, model }, null, 2),
+      JSON.stringify({ ...prev, provider, apiKey, model }, null, 2),
     );
 
     console.log("✔ Setup complete");

@@ -52,6 +52,8 @@ import {
 import { startWizard } from "./core/cli/wizard";
 import { ollamaAvailable } from "./core/ai/providers";
 import { changeModel, loadConfig, overwriteConfig } from "./core/cli/config";
+import { fetchModels } from "./core/ai/models";
+import { isMetaRequest } from "./core/cli/meta";
 import type { ModelMessage } from "ai";
 import chalk from "chalk";
 import readline from "readline";
@@ -251,12 +253,31 @@ async function handleTask(
   session?: ModelMessage[],
 ): Promise<void> {
   const sandboxImage = sandboxImageOf(opts);
+
+  // chat replies stream to the terminal as they generate; JSON/fenced
+  // command payloads are held back — they render as the numbered list below
+  let acc = "";
+  let hold = false;
+  let streamedAny = false;
+  const onText = (delta: string) => {
+    acc += delta;
+    if (hold) return;
+    if (/^\s*(\{|\[|```)/.test(acc)) {
+      hold = true;
+      return;
+    }
+    streamedAny = true;
+    process.stdout.write(delta);
+  };
+
   const gen = await generateStream(text, {
     history: session,
     preferLocal: opts.local,
+    onText,
     // inside docker the executor is POSIX sh, whatever the host is
     ...(sandboxImage ? { systemPrompt: buildSystemPrompt(SANDBOX_SHELL) } : {}),
   });
+  if (streamedAny) process.stdout.write("\n");
 
   const parsed = parseCommands(gen.text ?? "");
   const normalized = normalizeCommands(parsed);
@@ -270,8 +291,10 @@ async function handleTask(
 
   const content = normalized.join("\n");
   if (!content) {
-    if (gen.text && gen.text.trim()) console.log(gen.text.trim());
-    else
+    // a chat reply already streamed live — only print it if nothing streamed
+    if (gen.text && gen.text.trim() && !streamedAny)
+      console.log(gen.text.trim());
+    else if (!gen.text || !gen.text.trim())
       console.log(chalk.red("No commands generated — try being more specific."));
     return;
   }
@@ -302,14 +325,19 @@ async function handleTask(
   let commands = normalized;
 
   if (level !== "high") {
-    const ok = await select({
-      message: "Execute these commands?",
-      choices: [
-        { name: "Yes", value: 1 },
-        { name: "No", value: 0 },
-        { name: "Modify", value: 2 },
-      ],
-    });
+    let ok: number;
+    try {
+      ok = await select({
+        message: "Execute these commands?",
+        choices: [
+          { name: "Yes", value: 1 },
+          { name: "No", value: 0 },
+          { name: "Modify", value: 2 },
+        ],
+      });
+    } catch {
+      return; // Ctrl+C = don't run (no scary SIGINT error)
+    }
     if (ok !== 1 && ok !== 2) return;
     if (ok === 2) {
       const rl = readline.createInterface({
@@ -351,6 +379,97 @@ function doUndo(id?: string): void {
         ` — restored: ${result.restored} · removed: ${result.removed} · skipped: ${result.skipped}`,
       ),
   );
+}
+
+/** /model [name] — switch the active model; the current one is marked */
+async function runModelPage(arg?: string): Promise<void> {
+  const cfg = loadConfig();
+  if (arg) {
+    cfg.model = arg;
+    overwriteConfig(cfg);
+    console.log(chalk.green(`Model set to ${arg} — applies immediately.`));
+    return;
+  }
+  let models: string[];
+  try {
+    models = await fetchModels(cfg.provider, cfg.apiKey);
+  } catch (e) {
+    console.log(
+      chalk.red(
+        `Could not list models for ${cfg.provider}: ${e instanceof Error ? e.message : e}`,
+      ),
+    );
+    return;
+  }
+  if (models.length === 0) {
+    console.log(chalk.yellow("Provider returned no models."));
+    return;
+  }
+  let picked: string;
+  try {
+    picked = await select({
+      message: `Model (provider: ${cfg.provider})`,
+      choices: models.map((m) => ({
+        name: m === cfg.model ? `${m}  ✓ current` : m,
+        value: m,
+      })),
+      default: models.includes(cfg.model) ? cfg.model : undefined,
+    });
+  } catch {
+    return; // Ctrl+C
+  }
+  if (picked === cfg.model) {
+    console.log(chalk.dim(`${picked} is already active.`));
+    return;
+  }
+  cfg.model = picked;
+  overwriteConfig(cfg);
+  console.log(chalk.green(`Model changed to ${picked} — applies immediately.`));
+}
+
+/** /settings — live view of the config with inline changes */
+async function runSettingsPage(): Promise<void> {
+  for (;;) {
+    const cfg = loadConfig();
+    const up = await ollamaAvailable();
+    console.log(
+      [
+        "",
+        `  provider    ${chalk.cyan(cfg.provider)}`,
+        `  model       ${chalk.cyan(cfg.model)}`,
+        `  cheap mode  ${cfg.localEnabled ? chalk.green("ON") : chalk.dim("off")} · local model: ${chalk.cyan(cfg.localModel ?? "llama3.1")} · ollama: ${up ? chalk.green("reachable") : chalk.red("not running")}`,
+        `  config      ${chalk.dim("~/.meero/config.json")}`,
+        "",
+      ].join("\n"),
+    );
+    let action: string;
+    try {
+      action = await select({
+        message: "Settings",
+        choices: [
+          { name: "Change model", value: "model" },
+          { name: "Re-run setup (provider + API key)", value: "setup" },
+          {
+            name: `Cheap mode (Ollama): turn ${cfg.localEnabled ? "off" : "on"}`,
+            value: "local",
+          },
+          { name: "Back", value: "back" },
+        ],
+      });
+    } catch {
+      return; // Ctrl+C
+    }
+    if (action === "back") return;
+    if (action === "model") await runModelPage();
+    if (action === "setup") await setup();
+    if (action === "local") {
+      cfg.localEnabled = !cfg.localEnabled;
+      overwriteConfig(cfg);
+      console.log(
+        chalk.green(`Cheap mode ${cfg.localEnabled ? "enabled" : "disabled"}.`),
+      );
+    }
+  }
 }
 
 program
@@ -638,7 +757,16 @@ program.action(async (input: string[]) => {
       setSessionTrust: (level) => {
         sessionTrust = level as TrustLevel;
       },
+      runSettings: () => runSettingsPage(),
+      runModel: (arg) => runModelPage(arg),
     });
+    return;
+  }
+
+  if (isMetaRequest(text)) {
+    console.log(
+      "That looks like a meero config request — run: meero setup · meero model",
+    );
     return;
   }
 

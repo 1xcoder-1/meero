@@ -18,6 +18,8 @@ export async function runLLM(
   prompt: string,
   history?: ModelMessage[],
   systemPrompt?: string,
+  /** live callback — assistant text deltas stream to the caller as they arrive */
+  onText?: (delta: string) => void,
 ): Promise<RunResult> {
   const usage = emptyUsage();
   try {
@@ -40,6 +42,7 @@ export async function runLLM(
       switch (part.type) {
         case "text-delta":
           full += part.text;
+          onText?.(part.text);
           break;
         case "tool-call":
           usage.toolCalls++;

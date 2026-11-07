@@ -73,4 +73,12 @@ describe("system prompt shell contract", () => {
     expect(p).toContain("docker sandbox");
     expect(p).toContain("ONLY POSIX (sh) syntax");
   });
+
+  test("prompt forbids treating meero-the-CLI as installable third-party software", () => {
+    for (const id of ["pwsh", "bash"] as const) {
+      const p = buildSystemPrompt(fakeShell(id));
+      expect(p).toContain('"meero" MEANS THIS CLI');
+      expect(p).toContain("NEVER generate install commands");
+    }
+  });
 });
