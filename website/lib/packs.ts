@@ -1,0 +1,100 @@
+/** The 60 pre-built packs, mirroring core/cli/builtin.ts (README catalog) */
+export type PackRow = { id: string; alias: string; desc: string; risky?: boolean; args?: string };
+
+export const PACK_GROUPS: { group: string; rows: PackRow[] }[] = [
+  {
+    group: "git",
+    rows: [
+      { id: "git-status", alias: "status", desc: "branch status + last 5 commits" },
+      { id: "git-pull", alias: "pull", desc: "rebase pull with autostash" },
+      { id: "git-undo-commit", alias: "uncommit", desc: "undo the last commit, keep the changes" },
+      { id: "git-sync", alias: "sync", desc: "fetch all remotes with prune + status" },
+      { id: "git-branches", alias: "branches", desc: "all local + remote branches" },
+      { id: "git-log-graph", alias: "graph", desc: "commit graph, last 15" },
+      { id: "git-stash", alias: "stash", desc: "stash everything incl. untracked" },
+      { id: "git-diff", alias: "diff", desc: "uncommitted changes (stat + full diff)" },
+      { id: "git-last", alias: "last", desc: "last commit in detail" },
+      { id: "git-remote", alias: "remote", desc: "remotes with URLs" },
+      { id: "git-add-all", alias: "add", desc: "stage every change" },
+      { id: "git-unstage", alias: "unstage", desc: "unstage everything, keep edits" },
+      { id: "git-discard", args: "[file]", alias: "discard", desc: "back to the last committed version", risky: true },
+      { id: "git-blame", args: "[file]", alias: "blame", desc: "line-by-line authorship" },
+      { id: "git-tag-list", alias: "tags", desc: "tags, newest first" },
+      { id: "git-authors", alias: "authors", desc: "top contributors" },
+      { id: "git-amend", alias: "amend", desc: "add staged changes to the last commit" },
+    ],
+  },
+  {
+    group: "packages",
+    rows: [
+      { id: "update-system", alias: "sysupdate", desc: "update all system packages (winget/apt/brew)" },
+      { id: "update-choco", alias: "choco", desc: "update all apps via Chocolatey (windows)" },
+      { id: "npm-cache-clean", alias: "cacheclean", desc: "clear the npm cache" },
+      { id: "reinstall-node-modules", alias: "reinstall", desc: "wipe + fresh node_modules" },
+      { id: "deps-install", alias: "deps", desc: "install deps per lockfile presence" },
+      { id: "npm-outdated", alias: "outdated", desc: "current vs wanted vs latest versions" },
+      { id: "npm-update", alias: "update", desc: "update packages to wanted versions" },
+      { id: "npm-ls", alias: "ls", desc: "top-level installed packages" },
+      { id: "npm-scripts", alias: "scripts", desc: "every runnable package.json script" },
+      { id: "npm-test", alias: "test", desc: "run the project's tests" },
+      { id: "npm-ci", alias: "ci", desc: "clean install from the lockfile" },
+      { id: "npm-rebuild", alias: "rebuild", desc: "rebuild broken native modules" },
+      { id: "npm-audit", alias: "vuln", desc: "vulnerability report without fixing" },
+      { id: "npm-doctor", alias: "npmcheck", desc: "npm health check" },
+      { id: "npm-cache-verify", alias: "cachecheck", desc: "verify/repair the npm cache" },
+    ],
+  },
+  {
+    group: "network",
+    rows: [
+      { id: "public-ip", alias: "ip", desc: "your public IPv4/IPv6" },
+      { id: "check-url", args: "[url]", alias: "check", desc: "status code + timing of a URL" },
+      { id: "open-ports", alias: "ports", desc: "listening ports and their owners" },
+      { id: "network-info", alias: "net", desc: "adapters, IPs, gateways, DNS" },
+      { id: "dns-flush", alias: "dns", desc: "flush the DNS cache" },
+      { id: "active-connections", alias: "conns", desc: "active TCP connections" },
+      { id: "speed-test", alias: "speedtest", desc: "download speed via Cloudflare" },
+      { id: "show-hosts", alias: "hosts", desc: "show the hosts file" },
+    ],
+  },
+  {
+    group: "processes",
+    rows: [
+      { id: "kill-port", args: "[port]", alias: "killport", desc: "kill whatever listens on a port", risky: true },
+      { id: "top-processes", alias: "top", desc: "heaviest processes by CPU/memory" },
+      { id: "kill-node", alias: "killnode", desc: "kill all node processes", risky: true },
+    ],
+  },
+  {
+    group: "disk",
+    rows: [
+      { id: "disk-usage", alias: "disk", desc: "disk space per drive/mount" },
+      { id: "large-files", alias: "largest", desc: "biggest files under the current folder" },
+      { id: "clean-build", alias: "cleanbuild", desc: "delete dist/build/.next artifacts" },
+      { id: "empty-trash", alias: "trash", desc: "empty the recycle bin / trash", risky: true },
+    ],
+  },
+  {
+    group: "dev",
+    rows: [
+      { id: "docker-clean", alias: "dclean", desc: "clean stopped containers + dangling images (lists them first)", risky: true },
+      { id: "docker-ps", alias: "ps", desc: "running containers" },
+      { id: "docker-logs", args: "[container]", alias: "logs", desc: "last 100 log lines of a container" },
+      { id: "docker-stop", args: "[container]", alias: "stop", desc: "stop a container by name", risky: true },
+      { id: "docker-restart", args: "[container]", alias: "restart", desc: "restart a container by name" },
+      { id: "docker-images", alias: "images", desc: "local image cache" },
+      { id: "env-info", alias: "env", desc: "node / npm / git versions" },
+      { id: "npm-audit-fix", alias: "audit", desc: "auto-fix npm vulnerabilities" },
+      { id: "doctor", alias: "health", desc: "node / npm / git / docker up? disk free?" },
+      { id: "which", args: "[cmd]", alias: "whereis", desc: `where does a command resolve ("not found" fixer)` },
+      { id: "who-on-port", args: "[port]", alias: "whoport", desc: `which process holds a port (EADDRINUSE fixer)` },
+    ],
+  },
+  {
+    group: "system",
+    rows: [
+      { id: "system-info", alias: "sysinfo", desc: "OS, CPU, uptime summary" },
+      { id: "memory-usage", alias: "mem", desc: "total vs free memory" },
+    ],
+  },
+];

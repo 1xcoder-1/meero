@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- meero lockup — mark + wordmark, for README banners and docs headers -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320">
+  <g transform="translate(20,20) scale(0.2778)">
+    <rect x="32" y="32" width="960" height="960" rx="232" fill="#16181D"/>
+    <rect x="32" y="32" width="960" height="960" rx="232" fill="none" stroke="#2A2E38" stroke-width="8"/>
+    <polyline points="336,344 552,512 336,680" fill="none" stroke="#5EEAD4" stroke-width="104" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="592" y1="680" x2="712" y2="680" stroke="#5EEAD4" stroke-width="104" stroke-linecap="round"/>
+  </g>
+  <text x="360" y="212" font-family="Inter, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="170" font-weight="700" letter-spacing="-6" fill="#16181D">meero</text>
+  <rect x="1032" y="96" width="44" height="150" rx="22" fill="#5EEAD4"/>
+</svg>
