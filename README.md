@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo-full.svg" width="420" alt="meero" />
+</p>
+
 # meero
 
 An AI-powered CLI that converts natural language tasks into shell commands — inspects your system, generates the commands, guards the dangerous ones, runs them with your consent, and fixes itself when something fails.
@@ -67,8 +71,8 @@ Prefer a real installer? Every [release](https://github.com/1xcoder-1/meero/rele
 | Platform | Asset | Install |
 |---|---|---|
 | Windows | `meero-setup-windows-x64.exe` | Double-click — Start Menu shortcut, user PATH, uninstaller included |
-| Linux (Debian/Ubuntu) | `meero-linux-x64.deb` / `meero-linux-arm64.deb` | `sudo apt install ./meero-linux-x64.deb` |
-| macOS | `meero-macos-arm64.pkg` / `meero-macos-x64.pkg` | Double-click the package, or `sudo installer -pkg meero-macos-arm64.pkg -target /` |
+| Linux (Debian/Ubuntu) | `meero-linux-x64.deb` / `meero-linux-arm64.deb` | `curl -fsSL https://github.com/1xcoder-1/meero/releases/latest/download/meero-linux-$(dpkg --print-architecture \| sed 's/amd64/x64/').deb -o /tmp/meero.deb && sudo apt install -y /tmp/meero.deb` |
+| macOS | `meero-macos-arm64.pkg` / `meero-macos-x64.pkg` | `curl -fsSL https://github.com/1xcoder-1/meero/releases/latest/download/meero-macos-$(uname -m \| sed 's/x86_64/x64/').pkg -o /tmp/meero.pkg && sudo installer -pkg /tmp/meero.pkg -target /` |
 | Any (terminal) | `meero-*.zip` / `meero-*.tar.gz` | The `curl | bash` / `iwr | iex` scripts above |
 
 The Windows executable carries the meero icon (not the Bun default) and proper version metadata in its properties.
