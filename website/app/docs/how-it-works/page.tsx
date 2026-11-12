@@ -46,7 +46,7 @@ export default function HowItWorks() {
           <tr><td><C>os</C></td><td>Get OS platform and architecture</td></tr>
           <tr><td><C>env</C></td><td>List environment variable names</td></tr>
           <tr><td><C>listFiles</C></td><td>List files in a directory with metadata</td></tr>
-          <tr><td><C>readFile</C></td><td>Read file content (first 3000 chars)</td></tr>
+          <tr><td><C>readFile</C></td><td>Read file content (first 3000 chars; credential files are refused)</td></tr>
           <tr><td><C>readFileLines</C></td><td>Read specific lines from a file</td></tr>
           <tr><td><C>fileExists</C></td><td>Check if a file or directory exists</td></tr>
           <tr><td><C>gitStatus</C></td><td>Get git status (short format)</td></tr>

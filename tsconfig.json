@@ -25,5 +25,9 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  // The website is a separate Next project with its own tsconfig —
+  // including it here makes root `tsc --noEmit` fail on its path aliases.
+  "include": ["index.ts", "core/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist", "website", "scripts"]
 }
