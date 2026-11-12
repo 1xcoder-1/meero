@@ -45,6 +45,7 @@ export default function Development() {
 │   │   ├── clipboard.ts       # cross-platform copy
 │   │   └── sandbox.ts         # Docker execution
 │   └── input.ts               # input parsing & command normalization
+├── website/                   # landing page + these docs (Next.js 16, Tailwind 4)
 ├── test/                      # bun test suite
 ├── assets/                    # icons (logo.svg is the single source of truth)
 └── scripts/                   # installers, icon packaging, CI helpers`}</code>
@@ -56,6 +57,20 @@ export default function Development() {
         <code>{`bun install
 bun test              # unit tests
 bunx tsc --noEmit     # strict typecheck`}</code>
+      </Pre>
+
+      <h2>The website</h2>
+      <p>
+        The landing page and these docs live in <C>website/</C>. It is a
+        Next.js app that builds to plain static files, so it can be hosted
+        anywhere:
+      </p>
+      <Pre>
+        <code>{`cd website
+npm install
+npm run dev        # http://localhost:3000
+npm run build      # static export -> out/
+npm run lint`}</code>
       </Pre>
 
       <h2>Releases</h2>

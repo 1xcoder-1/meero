@@ -15,9 +15,19 @@ npm run dev        # http://localhost:3000
 ## Build it
 
 ```bash
-npm run build      # production build
-npm start          # serve the production build
+npm run build      # static export -> out/ (ready to host anywhere)
 npm run lint       # eslint (app, components, lib, scripts)
+```
+
+`next.config.ts` sets `output: "export"`, so the build writes plain static
+files into `out/`: `out/index.html`, `out/docs/*/index.html`, `out/og.png`,
+`out/sitemap.xml`, `out/robots.txt`. Drop that folder on any static host
+(Netlify, GitHub Pages, Cloudflare Pages, plain nginx) - no Node server needed.
+
+To preview the built site locally:
+
+```bash
+npx serve out
 ```
 
 ## Layout

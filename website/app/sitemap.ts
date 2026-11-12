@@ -1,6 +1,9 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/lib/site";
 
+// static export: this route has to be prerendered
+export const dynamic = "force-static";
+
 /** Every docs page, in reading order. */
 const DOCS_ROUTES = [
   "/docs",
