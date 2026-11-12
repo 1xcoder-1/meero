@@ -61,6 +61,48 @@ describe("inspectCommand — safe (must NOT false-positive)", () => {
   }
 });
 
+describe("inspectCommand — gate-gap regressions (audit bypasses)", () => {
+  const dangerous = [
+    // PowerShell home env vars were not in the dangerous-target list
+    "Remove-Item -Recurse -Force $env:USERPROFILE",
+    "ri -re -fo $env:USERPROFILE",
+    "ri -fo -re $env:HOMEPATH",
+    "rm -rf $env:USERPROFILE",
+    // Interpreter-based deletes bypassed the rm/cmd patterns
+    "python -c \"import shutil; shutil.rmtree('/home/me')\"",
+    "python -c \"import shutil; shutil.rmtree(os.environ['USERPROFILE'])\"",
+    "node -e \"require('fs').rmSync('/home/me', { recursive: true, force: true })\"",
+    // find -delete against system paths
+    "find / -name '*.log' -delete",
+    "find ~ -type f -delete",
+    // Relative force-deletes of the working/parent directory
+    "rm -rf .",
+    "rm -rf ..",
+    "sudo rm -rf ./",
+  ];
+
+  for (const cmd of dangerous) {
+    test(cmd, () => {
+      expect(inspectCommand(cmd)).not.toBeNull();
+    });
+  }
+
+  const safe = [
+    "echo $env:USERPROFILE",
+    "Write-Host $env:USERPROFILE $env:HOMEPATH",
+    "python -c \"print('hello')\"",
+    "node -e \"console.log(os.homedir())\"",
+    "rm -rf dist .next cache",
+    "find . -maxdepth 2 -name '*.tmp'",
+  ];
+
+  for (const cmd of safe) {
+    test(`not flagged: ${cmd}`, () => {
+      expect(inspectCommand(cmd)).toBeNull();
+    });
+  }
+});
+
 describe("findDangerous", () => {
   test("returns only the dangerous ones with reasons", () => {
     const result = findDangerous(["ls", "rm -rf /", "pwd"]);

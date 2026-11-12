@@ -90,4 +90,11 @@ describe("system prompt shell contract", () => {
     );
     expect(p).toContain("call any tool (readFile, webSearch, ...)");
   });
+
+  test("prompt tells the model never to read secret-bearing files", () => {
+    const p = buildSystemPrompt(fakeShell("pwsh"));
+    expect(p).toContain("NEVER read secret-bearing files");
+    expect(p).toContain(".env");
+    expect(p).toContain(".ssh");
+  });
 });

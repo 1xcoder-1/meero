@@ -17,6 +17,32 @@ function resolvePath(p?: string) {
   return path.resolve(p);
 }
 
+/**
+ * Credential-bearing paths the read tools must never expose to the model:
+ * the AI is read-only, but a secret it can read is a secret it can leak
+ * (provider context, webSearch queries). Enforcement lives here, not in
+ * the system prompt.
+ */
+const SECRET_PATHS: RegExp[] = [
+  /(^|[\\/])\.env([./-]|$)/i, // .env, .env.local, .env.production
+  /[\\/]\.meero([\\/]|$)/i, // meero's own config (API keys)
+  /[\\/]\.(ssh|aws|gnupg|azure|docker)([\\/]|$)/i,
+  /(^|[\\/])\.npmrc$/i,
+  /(^|[\\/])\.netrc$/i,
+  /(^|[\\/])_netrc$/i,
+  /[\\/]\.git-credentials$/i,
+  /\.pem$/i,
+  /[\\/]id_[a-z0-9]+$/i, // ssh key pairs
+  /[\\/](credentials|secrets?)(\.(json|ya?ml|env))?$/i,
+];
+
+export function isSensitivePath(p: string): boolean {
+  return SECRET_PATHS.some((re) => re.test(p));
+}
+
+const SECRET_DENIED =
+  "Error: access denied — this path may contain credentials and is blocked by design";
+
 // Captured final answer from the returnCommands tool (structured output,
 // replaces fragile regex parsing of the model's text)
 let capturedCommands: string[] | null = null;
@@ -244,6 +270,7 @@ export const tools = {
       withSpinner("readFile", async () => {
         try {
           const full = resolvePath(p);
+          if (isSensitivePath(full)) return SECRET_DENIED;
           return readFileSync(full, "utf-8").slice(0, 3000);
         } catch (e) {
           return `Error: ${e instanceof Error ? e.message : String(e)}`;
@@ -269,6 +296,7 @@ export const tools = {
       withSpinner("readFileLines", async () => {
         try {
           const full = resolvePath(p);
+          if (isSensitivePath(full)) return SECRET_DENIED;
           const lines = readFileSync(full, "utf-8").split("\n");
           const s = Math.max(start - 1, 0);
           const e = end ? Math.min(end, lines.length) : s + 50;
@@ -316,6 +344,7 @@ export const tools = {
     execute: async ({ query, path: p }) =>
       withSpinner("searchFiles", async () => {
         const dir = resolvePath(p);
+        if (isSensitivePath(dir)) return SECRET_DENIED;
         try {
           if (os.platform() === "win32") {
             // PowerShell Select-String (grep does not exist natively on Windows)

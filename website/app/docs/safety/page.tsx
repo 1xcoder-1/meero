@@ -23,7 +23,11 @@ export default function Safety() {
       <p>
         Patterns like <C>rm -rf /</C>, <C>shutdown</C>, <C>format</C>, fork
         bombs and disk wipes are blocked right away, before any prompt is
-        shown.
+        shown. The rules also catch the sneaky forms: deletes aimed at{" "}
+        <C>$env:USERPROFILE</C> / <C>os.homedir()</C>, short PowerShell
+        aliases (<C>ri -re -fo</C>), <C>find -delete</C> on system paths,
+        relative <C>rm -rf .</C>, and deletes smuggled through{" "}
+        <C>python -c</C> / <C>node -e</C>.
       </p>
 
       <h2>Layer 2: blast-radius preview</h2>
@@ -47,7 +51,7 @@ export default function Safety() {
         command&apos;s risks.
       </p>
 
-      <h2>Undo: everything is reversible</h2>
+      <h2>Undo: file changes are reversible</h2>
       <p>
         Everything destructive is snapshotted first (into{" "}
         <C>~/.meero/trash</C>), so <C>meero undo</C> can restore it:
@@ -61,6 +65,18 @@ meero undo <id>          # revert a specific snapshot`}</code>
         A revert reports what it did: restored / removed / skipped counts.
         Snapshot creation never blocks a run. If a snapshot fails you get a
         yellow warning telling you <C>meero undo</C> will not cover that run.
+        Undo is file-level: a pushed commit, an API call or a database change
+        is one-way — the gate stops these, but it cannot reverse them.
+      </p>
+
+      <h2>Secrets stay off the AI&apos;s radar</h2>
+      <p>
+        The read tools are enforced at runtime, not by prompt:{" "}
+        <C>readFile</C>, <C>readFileLines</C> and <C>searchFiles</C> refuse
+        credential paths — <C>.env*</C>, <C>~/.meero</C> config,{" "}
+        <C>.ssh/</C>, <C>.aws/</C>, <C>.npmrc</C>, <C>*.pem</C>,{" "}
+        <C>.git-credentials</C> and friends. The model can never paste your
+        keys into a provider request or a web search.
       </p>
 
       <h2>Trust levels</h2>

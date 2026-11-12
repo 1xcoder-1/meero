@@ -75,7 +75,8 @@ npm run lint`}</code>
 
       <h2>Releases</h2>
       <p>
-        Released binaries are built by GitHub Actions on every{" "}
+        Every push and pull request runs CI (CLI tests + typecheck, website
+        lint + build). Released binaries are built by GitHub Actions on every{" "}
         <C>v*</C> tag; the test job gates the build. The pipeline:
       </p>
       <Pre>

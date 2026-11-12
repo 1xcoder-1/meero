@@ -11,16 +11,19 @@ import { webSearchTop, type WebSearchResult } from "../ai/tools";
  */
 
 const DANGEROUS_TARGETS: RegExp[] = [
-  // Unix root and root glob: "/" or "/*"
-  /(^|\s)\/(\s|$|\*)/,
+  // Unix root and root glob: "/" or "/*" (also quoted, e.g. shutil.rmtree('/'))
+  /(^|[\s"'`])\/(\s|["'`*]|$)/,
   // System directories: /bin /etc /usr /var /home /root /dev /sys /proc /lib /sbin /boot /run /srv
-  /(^|\s)\/(bin|boot|dev|etc|home|lib|proc|root|run|sbin|srv|sys|usr|var)(\/|\s|$)/,
+  /(^|[\s"'`])\/(bin|boot|dev|etc|home|lib|proc|root|run|sbin|srv|sys|usr|var)(\/|[\s"'`]|$)/,
   // Home: ~, ~/..., $HOME
   /(^|\s)~(\/|\s|$)/,
   /\$HOME|\$\{HOME\}/i,
   // Windows drive roots and known system folders: C:\, C:\*, C:\Users, C:\Windows, C:\Program Files
   /(^|\s)[a-z]:\\?(\s|$|\*)/i,
   /(^|\s)[a-z]:\\?(users|program files|windows)/i,
+  // Home via env references: $env:USERPROFILE / $env:HOMEPATH / %USERPROFILE% /
+  // os.environ['USERPROFILE'] / os.homedir() / os.homedirectory
+  /(userprofile|homedir|hometdirectory|env:home)/i,
   // Bare glob targeting everything
   /(^|\s)\*(\s|$)/,
 ];
@@ -83,10 +86,39 @@ export function inspectCommand(cmd: string): string | null {
     /(^|[;&|]\s*)del\b[^|;&]*\/s[^|;&]*\/q/.test(lower) ||
     /(^|[;&|]\s*)del\b[^|;&]*\/q[^|;&]*\/s/.test(lower) ||
     /(^|[;&|]\s*)(rd|rmdir)\b[^|;&]*\/s[^|;&]*\/q/.test(lower) ||
-    /(^|[;&|]\s*)(rd|rmdir)\b[^|;&]*\/q[^|;&]*\/s/.test(lower);
+    /(^|[;&|]\s*)(rd|rmdir)\b[^|;&]*\/q[^|;&]*\/s/.test(lower) ||
+    // Split short flags on PowerShell cmdlets/aliases: -r -f, -re -fo, -fo -rec ...
+    /(^|[;&|]\s*)(remove-item|ri|rm|del|erase)\b[^|;&]*\s-(?:r|re|rec|recurse|recursive)\b[^|;&]*\s-(?:f|fo|for|forc|force)\b/.test(
+      lower,
+    ) ||
+    /(^|[;&|]\s*)(remove-item|ri|rm|del|erase)\b[^|;&]*\s-(?:f|fo|for|forc|force)\b[^|;&]*\s-(?:r|re|rec|recurse|recursive)\b/.test(
+      lower,
+    );
 
   if (rmForceRecursive && hasDangerousTarget(lower))
     return "recursive force-delete targeting a system/root path";
+
+  // Force-recursive delete aimed at the current or parent directory itself
+  if (
+    /(^|[;&|]\s*)(sudo\s+)?rm\b[^|;&]*(?:-\w*(rf|fr)\w*|--recursive|--force)/.test(
+      lower,
+    ) &&
+    /\s\.\.?\/?(\s|$)/.test(lower)
+  )
+    return "recursive force-delete targeting the current or parent directory";
+
+  // find -delete against system/root paths (relative "." searches stay allowed)
+  if (/\bfind\b[^|;&]*-delete\b/.test(lower) && hasDangerousTarget(lower))
+    return "find -delete targeting a system/root path";
+
+  // Deletes smuggled through an interpreter: python -c "shutil.rmtree(...)",
+  // node -e "require('fs').rmSync(...)" — the rm/cmd patterns above never see
+  // these, so match the bare call names (the object prefix is quote-broken)
+  if (
+    /\b(?:rmtree|rmsync|os\.remove|os\.unlink)\b/.test(lower) &&
+    hasDangerousTarget(lower)
+  )
+    return "scripted delete targeting a system/root path";
 
   // Registry destruction
   if (

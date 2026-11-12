@@ -177,6 +177,7 @@ TOOL RULES (SYSTEM)
 - Use listFiles before directory actions
 - Use gitDiff for commit-related tasks
 - Use readFileLines for large files
+- NEVER read secret-bearing files (.env, ~/.meero config, .ssh/, .aws/, .npmrc, *.pem) — readFile refuses them by design; if credentials are needed, ask the user
 
 TOOL RULES (WEB)
 - ALWAYS use webSearch when the user asks "what command", "how do I", "what is"
