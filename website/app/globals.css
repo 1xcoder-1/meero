@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg: #000000;
+  --color-bg-soft: #0d0d0d;
+  --color-fg: #ffffff;
+  --color-muted: #b3b3b3;
+  --color-faint: #808080;
+  --color-line: #1a1a1a;
+  --color-brand: #5eead4;
+  --color-brand-dim: #2dd4bf;
+  --color-danger: #f87171;
+  --color-warn: #fbbf24;
+  --color-ok: #4ade80;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "Cascadia Code", monospace;
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  overflow-x: clip;
+}
+
+/* fully hidden scrollbars (content can still be scrolled/wheeled) */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+::selection {
+  background: rgba(94, 234, 212, 0.25);
+}
+
+/* docs prose (hand-rolled, no typography plugin) */
+.prose-meero h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.75rem;
+}
+.prose-meero h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.prose-meero h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+.prose-meero p {
+  color: var(--color-muted);
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+.prose-meero ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  color: var(--color-muted);
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+.prose-meero ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  color: var(--color-muted);
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+.prose-meero li + li {
+  margin-top: 0.25rem;
+}
+.prose-meero strong {
+  color: var(--color-fg);
+  font-weight: 600;
+}
+.prose-meero a {
+  color: var(--color-brand);
+  text-decoration: none;
+}
+.prose-meero a:hover {
+  text-decoration: underline;
+}
+.prose-meero :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--color-fg);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-line);
+  border-radius: 0.375rem;
+  padding: 0.1em 0.4em;
+  white-space: nowrap;
+}
+.prose-meero table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0 1.5rem;
+  font-size: 0.875rem;
+}
+.prose-meero th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-fg);
+  border-bottom: 1px solid var(--color-line);
+  padding: 0.5rem 0.75rem;
+  white-space: nowrap;
+}
+.prose-meero td {
+  color: var(--color-muted);
+  border-bottom: 1px solid rgba(35, 35, 41, 0.6);
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+}
+.prose-meero td code {
+  color: var(--color-brand);
+  background: none;
+  border: none;
+  padding: 0;
+}
+.prose-meero hr {
+  border-color: var(--color-line);
+  margin: 2rem 0;
+}

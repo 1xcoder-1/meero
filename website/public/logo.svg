@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- meero mark — hand-crafted flat vector. Terminal prompt ">_" in a squircle. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- tile -->
+  <rect x="32" y="32" width="960" height="960" rx="232" fill="#16181D"/>
+  <!-- subtle inner edge so the tile reads on dark backgrounds -->
+  <rect x="32" y="32" width="960" height="960" rx="232" fill="none" stroke="#2A2E38" stroke-width="8"/>
+  <!-- chevron ">" : single round-capped polyline -->
+  <polyline points="336,344 552,512 336,680" fill="none" stroke="#5EEAD4" stroke-width="104" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- underscore "_" : same weight, sits on the baseline of the chevron -->
+  <line x1="592" y1="680" x2="712" y2="680" stroke="#5EEAD4" stroke-width="104" stroke-linecap="round"/>
+</svg>
