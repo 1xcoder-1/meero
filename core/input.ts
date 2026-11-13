@@ -45,8 +45,18 @@ export function parseCommands(output: string): string[] {
   return [];
 }
 
+/**
+ * Collapse runs of whitespace ONLY outside quoted sections, so string
+ * literals like `git commit -m "fix:   spacing"` or awk field separators
+ * survive normalization untouched.
+ */
 export function normalizeCommands(cmds: string[]) {
   if (!Array.isArray(cmds)) return [];
-
-  return cmds.map((cmd) => cmd.replace(/\s+/g, " ").replace(/^\s+|\s+$/g, ""));
+  return cmds.map((cmd) =>
+    cmd
+      .trim()
+      .split(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g) // keep quoted runs intact
+      .map((chunk, i) => (i % 2 === 1 ? chunk : chunk.replace(/\s+/g, " ")))
+      .join(""),
+  );
 }

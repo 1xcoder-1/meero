@@ -17,8 +17,8 @@ export default function HowItWorks() {
 
       <h2>System prompt &amp; the three modes</h2>
       <p>
-        meero uses a strict system prompt that forces the AI into one of
-        three modes per task:
+        meero uses a structured system prompt so the AI chooses the right mode
+        for each developer request:
       </p>
       <table>
         <thead>

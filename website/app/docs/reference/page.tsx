@@ -31,8 +31,8 @@ export default function Reference() {
           <tr><td><C>meero &quot;&lt;task&gt;&quot;</C></td><td>AI generates and runs shell commands for your shell</td></tr>
           <tr><td><C>meero commit all my changes</C></td><td>AI task, typed without quotes too</td></tr>
           <tr><td><C>meero &lt;pack&gt; [args]</C></td><td>Run a pre-built pack directly, no AI</td></tr>
-          <tr><td><C>meero /&lt;command&gt;</C></td><td>Same commands in slash form</td></tr>
-          <tr><td><C>meero</C></td><td>The help box. There is no chat mode</td></tr>
+          <tr><td><C>meero /&lt;command&gt;</C></td><td>Same commands in slash form (incl. <C>/commit</C>, <C>/recommit</C>)</td></tr>
+          <tr><td><C>meero</C></td><td>Interactive task mode in a terminal (help in scripts/pipes)</td></tr>
         </tbody>
       </table>
 
@@ -45,6 +45,8 @@ export default function Reference() {
           <tr><td><C>meero setup</C></td><td>Configure provider + API key (masked input)</td></tr>
           <tr><td><C>meero settings</C></td><td>Model, provider and cheap mode in one page</td></tr>
           <tr><td><C>meero model [name]</C></td><td>List or switch the active model</td></tr>
+          <tr><td><C>meero commit (cm)</C></td><td>Fresh commit from staged changes, AI message (<C>-m</C> to override)</td></tr>
+          <tr><td><C>meero recommit (rec)</C></td><td>Rewrite past commit messages with AI (<C>--dry-run</C>, <C>-n N</C>, <C>--all</C>)</td></tr>
           <tr><td><C>meero undo [id] [--list]</C></td><td>Revert a task&apos;s file changes</td></tr>
           <tr><td><C>meero history [--clear]</C></td><td>Recent tasks and outcomes</td></tr>
           <tr><td><C>meero trust [level] [--here]</C></td><td>Confirmation strictness: low | med | high</td></tr>

@@ -20,6 +20,8 @@ export async function runLLM(
   systemPrompt?: string,
   /** live callback — assistant text deltas stream to the caller as they arrive */
   onText?: (delta: string) => void,
+  /** false = plain-text generation (e.g. commit messages) with NO tools */
+  enableTools = true,
 ): Promise<RunResult> {
   const usage = emptyUsage();
   try {
@@ -31,7 +33,7 @@ export async function runLLM(
       ...(history && history.length > 0
         ? { messages: [...history, { role: "user", content: prompt }] }
         : { prompt }),
-      tools: tools,
+      ...(enableTools ? { tools } : {}),
       stopWhen: stepCountIs(20),
     });
 
@@ -62,9 +64,11 @@ export async function runLLM(
     }
 
     // Structured output wins over text: the AI called returnCommands with
-    // real arrays, so no regex/JSON text parsing can corrupt it.
+    // real arrays, so no regex/JSON text parsing can corrupt it. An EMPTY
+    // captured array (unsafe/impossible task) must also win — falling back
+    // to raw stream text would let prose be parsed as commands.
     const captured = getCapturedCommands();
-    if (captured && captured.length > 0) {
+    if (captured !== null) {
       return { text: JSON.stringify(captured), usage };
     }
 

@@ -43,10 +43,19 @@ meero what is the command to initialise a vite project`}</code>
         <C>sh</C>.
       </p>
 
-      <h2>No task, no chat</h2>
+      <h2>Interactive mode &amp; casual chat</h2>
+      <p>
+        Run <C>meero</C> in a terminal (or <C>meero interactive</C>) to start
+        an interactive multi-step REPL that keeps session context. Casual
+        conversation is refused locally before any model call. Developer and
+        technical questions can be answered briefly in plain text when no
+        command should run.
+      </p>
       <Pre>
-        <code>{`meero          # prints the help box, there is no chat mode
-meero hi       # refused before any AI call, meero is a tool, not a chatbot`}</code>
+        <code>{`meero                       # interactive task mode (TTY)
+meero interactive           # same (alias: i, repl)
+meero hi                    # refused locally — no AI call, no tokens
+meero "what does -x mean?"  # technical explanation (no commands)`}</code>
       </Pre>
       <p>
         AI runs only for a real developer task. Even then the model must
@@ -79,6 +88,13 @@ meero hi       # refused before any AI call, meero is a tool, not a chatbot`}</c
         <strong>Modify</strong>: the command list is pre-filled on the input
         line, joined with the correct separator for your shell. Whatever
         you leave is what runs.
+      </p>
+
+      <h2>AI commits</h2>
+      <p>
+        <C>meero commit</C> makes a fresh commit from staged changes with an
+        AI-written message; <C>meero recommit</C> rewrites the messages of your
+        past commits. See <Link href="/docs/commits">AI commits</Link>.
       </p>
 
       <h2>Self-repair</h2>

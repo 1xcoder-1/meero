@@ -245,3 +245,50 @@ jobs:
           files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-npm:
+    name: Publish to npm
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    # npm publish needs provenance id-token when using trusted publishing;
+    # also works with NPM_TOKEN via NODE_AUTH_TOKEN.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (npm registry)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install deps
+        run: bun install
+
+      - name: Build npm package
+        run: bun run build:npm
+
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Ensure npm is recent enough for provenance/trusted publishing
+          npm --version
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "Publishing with NPM_TOKEN..."
+            npm publish --access public --provenance
+          else
+            echo "NPM_TOKEN not set; attempting trusted publishing (OIDC)..."
+            npm publish --access public --provenance
+          fi
+        # Allow release to succeed even if npm publish is not yet configured
+        # (e.g. missing token/trusted publisher). Configure NPM_TOKEN secret or
+        # npm trusted publishing for the repo/workflow to enable this.
+        continue-on-error: true

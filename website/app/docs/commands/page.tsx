@@ -32,7 +32,10 @@ export default function AllCommands() {
           <tr><td><C>meero &quot;&lt;task&gt;&quot;</C></td><td>meero looks at your system, makes the shell commands for your exact shell, shows them with the cost, and runs them only after you say yes</td></tr>
           <tr><td><C>meero commit all my changes</C></td><td>The same thing, without quotes</td></tr>
           <tr><td><C>meero what is the command to initialise a vite project</C></td><td>Questions work too. The answer is always commands, never chat</td></tr>
-          <tr><td><C>meero</C></td><td>Shows the help box. There is no chat mode</td></tr>
+          <tr><td><C>meero</C></td><td>Interactive task mode in a terminal (help in scripts/pipes)</td></tr>
+          <tr><td><C>meero interactive</C></td><td>Start interactive multi-step task mode (aliases: <C>i</C>, <C>repl</C>)</td></tr>
+          <tr><td><C>meero commit</C></td><td>Fresh commit from staged changes — AI writes the message, you confirm</td></tr>
+          <tr><td><C>meero recommit</C></td><td>Rewrite past commit messages with AI (backup branch, --dry-run, -n N, --all)</td></tr>
         </tbody>
       </table>
 
@@ -73,6 +76,8 @@ meero /builtin               # the ready-made pack menu
 meero /undo                  # put back the files from the last task  (/undo --list to see them)
 meero /trust low             # how strict confirmations are (/trust shows the current level)
 meero /commands              # full list: every command, flag and pack
+meero /commit                # fresh commit, AI message
+meero /recommit              # rewrite past commit messages
 meero /help                  # the short help box
 meero /exit                  # there is nothing to exit. one task per call`}</code>
       </Pre>
@@ -143,7 +148,8 @@ meero /exit                  # there is nothing to exit. one task per call`}</co
       <h2>Always on</h2>
       <Pre>
         <code>{`safety gate, file preview before running, web check for odd commands, self repair
-backups for undo, cost line after every task, shell auto-detect, no chat allowed`}</code>
+backups for undo, cost line after every task, shell auto-detect
+interactive task mode · technical Q&A (no forced commands)`}</code>
       </Pre>
 
       <p>

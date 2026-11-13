@@ -186,6 +186,9 @@ export function extractTargets(
   cwd = process.cwd(),
 ): string[] {
   const found = new Set<string>();
+  // Creation verbs (touch/mkdir/new-item) target files that do not exist
+  // yet — they must be registered so `meero undo` can delete them.
+  const CREATION_VERBS = new Set(["touch", "mkdir", "new-item", "ni"]);
 
   for (const cmd of commands) {
     const { verb, args, redirect } = parseCommand(cmd);
@@ -203,7 +206,7 @@ export function extractTargets(
       if (!looksLikePath(t)) continue;
       for (const p of expandGlob(t, cwd)) {
         if (isRootish(p)) continue;
-        if (existsSync(p)) found.add(p);
+        if (existsSync(p) || CREATION_VERBS.has(verb)) found.add(p);
       }
     }
   }
@@ -469,7 +472,7 @@ function gitPushPreview(cmd: string, cwd: string): string[] {
     const out = execFileSync(
       "git",
       ["log", "--oneline", "-n", "10", "@{u}..HEAD"],
-      { cwd, encoding: "utf-8" },
+      { cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
     ).trim();
     if (!out) return [head.replace(" would send:", ": nothing ahead of upstream")];
     return [head, ...out.split("\n").map((l) => `    ${l}`)];

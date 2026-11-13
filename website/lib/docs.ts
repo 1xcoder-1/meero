@@ -19,6 +19,7 @@ export const DOCS_SECTIONS: {
       { href: "/docs/slash-commands", title: "Slash commands" },
       { href: "/docs/reference", title: "Commands & flags" },
       { href: "/docs/builtins", title: "Pre-built command packs" },
+      { href: "/docs/commits", title: "AI commits" },
       { href: "/docs/recipes", title: "Recipes" },
       { href: "/docs/safety", title: "Safety, trust & undo" },
       { href: "/docs/history", title: "Task history" },

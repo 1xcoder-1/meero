@@ -14,8 +14,10 @@ export const SLASH_COMMANDS: { name: string; desc: string }[] = [
   { name: "/undo", desc: "revert files changed by the last task" },
   { name: "/trust", desc: "low | med | high — confirmation strictness" },
   { name: "/commands", desc: "this reference" },
+  { name: "/commit", desc: "fresh commit from staged changes (AI message)" },
+  { name: "/recommit", desc: "rewrite past commit messages with AI" },
   { name: "/help", desc: "the short help box" },
-  { name: "/exit", desc: "nothing to exit — meero runs one task per call" },
+  { name: "/interactive", desc: "hint: use `meero interactive` for multi-step task mode" },
 ];
 
 const FLAGS: readonly (readonly [string, string])[] = [
@@ -31,6 +33,8 @@ const CLI_COMMANDS: readonly (readonly [string, string])[] = [
   ["meero <pack> [args]", "run a pre-built pack directly, no AI"],
   ["meero /<command>", "same commands in slash form"],
   ["meero setup / settings / model", "configure provider, key, model"],
+  ["meero commit (cm)", "fresh commit from staged changes, AI message (-m to override)"],
+  ["meero recommit (rec)", "rewrite past commit messages with AI (--dry-run, -n N, --all)"],
   ["meero undo [id] [--list]", "revert a task's file changes"],
   ["meero history [--clear]", "recent tasks and outcomes"],
   ["meero trust [level] [--here]", "confirmation strictness"],

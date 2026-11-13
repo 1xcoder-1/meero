@@ -25,6 +25,8 @@ meero /builtin               # the pre-built pack menu
 meero /undo                  # revert the last task  (/undo --list for snapshots)
 meero /trust low             # confirmation strictness (/trust shows the current one)
 meero /commands              # full reference: every command, flag and pack
+meero /commit                # fresh commit, AI message
+meero /recommit              # rewrite past commit messages
 meero /help                  # the short help box
 meero /exit                  # nothing to exit, one task per call`}</code>
       </Pre>
@@ -41,6 +43,8 @@ meero /exit                  # nothing to exit, one task per call`}</code>
           <tr><td><C>/undo [id] / --list</C></td><td><C>meero undo</C></td><td>Revert files changed by the last task</td></tr>
           <tr><td><C>/trust [level] [--here]</C></td><td><C>meero trust</C></td><td>Confirmation strictness, per directory supported</td></tr>
           <tr><td><C>/commands</C></td><td><C>meero commands</C></td><td>Full reference: every command, flag and pack</td></tr>
+          <tr><td><C>/commit</C></td><td><C>meero commit</C></td><td>Fresh commit from staged changes (AI message)</td></tr>
+          <tr><td><C>/recommit</C></td><td><C>meero recommit</C></td><td>Rewrite past commit messages with AI</td></tr>
           <tr><td><C>/help</C></td><td><C>meero help</C></td><td>The short help box</td></tr>
           <tr><td><C>/exit</C>, <C>/quit</C></td><td>-</td><td>Reminds you there is nothing to exit</td></tr>
         </tbody>
