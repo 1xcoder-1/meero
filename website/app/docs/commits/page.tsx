@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Pre, C, Callout, Pager } from "@/components/md";
 import { docsPager } from "@/lib/docs";
 
