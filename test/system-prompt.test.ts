@@ -84,11 +84,12 @@ describe("system prompt shell contract", () => {
 
   test("prompt locks the AI out of chat: small talk → empty commands, never prose or tools", () => {
     const p = buildSystemPrompt(fakeShell("pwsh"));
-    expect(p).toContain("NOT a chatbot. You NEVER chat.");
-    expect(p).toContain(
-      "call returnCommands({ commands: [] }) — NEVER reply with prose and NEVER",
-    );
-    expect(p).toContain("call any tool (readFile, webSearch, ...)");
+    expect(p).toContain("not a general-purpose chatbot");
+    expect(p).toContain("call returnCommands({ commands: [] })");
+    expect(p).toContain("— NEVER reply with prose and NEVER call any tool");
+    // technical questions are also answered through the tool, never as prose
+    expect(p).toContain("never reply in prose");
+    expect(p).toContain("Every answer goes through returnCommands");
   });
 
   test("prompt tells the model never to read secret-bearing files", () => {
