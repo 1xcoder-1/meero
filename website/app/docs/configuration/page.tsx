@@ -17,7 +17,7 @@ export default function Configuration() {
       <h1>Configuration</h1>
       <p>
         All settings live in <C>~/.meero/config.json</C>. They are managed
-        through real commands. There is no chat mode for changing them.
+        through real commands. Casual chat is not supported; use these commands to change them.
       </p>
 
       <Pre>

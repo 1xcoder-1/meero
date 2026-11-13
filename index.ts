@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { Command } from "commander";
+import type { ModelMessage } from "ai";
 import pkg from "./package.json" with { type: "json" };
 import { setup, reset } from "./core/cli/setup";
 import { generateStream } from "./core/ai/stream";
@@ -51,6 +52,12 @@ import {
   type BuiltinCmd,
 } from "./core/cli/builtin";
 import { CASUAL_REPLY, stripMeeroPrefix } from "./core/cli/guardrail";
+import {
+  runRecommit,
+  runFreshCommit,
+  type RecommitOpts,
+  type FreshCommitOpts,
+} from "./core/cli/commits";
 import { routeInput } from "./core/cli/router";
 import { buildCommandsReference, SLASH_COMMANDS } from "./core/cli/reference";
 import { copyToClipboard } from "./core/cli/clipboard";
@@ -260,7 +267,10 @@ async function runTask(
 }
 
 /** Full pipeline for one natural-language task (CLI one-shot) */
-async function handleTask(text: string, opts: RunOpts): Promise<void> {
+async function handleTask(
+  text: string,
+  opts: RunOpts = {},
+): Promise<void> {
   const sandboxImage = sandboxImageOf(opts);
 
   // chat replies stream to the terminal as they generate; JSON/fenced
@@ -306,7 +316,19 @@ async function handleTask(text: string, opts: RunOpts): Promise<void> {
   // cost line — tokens + approximate $, printed with every task
   console.log(chalk.dim(`  ${formatUsage(gen.usage, gen.modelUsed)}`));
 
-  if (opts.print || opts.dryRun) return; // Tier-2: just show the command
+
+  if (opts.copy) {
+    console.log(
+      copyToClipboard(content)
+        ? chalk.green("Copied to clipboard — nothing was executed.")
+        : chalk.yellow("Clipboard unavailable on this system."),
+    );
+    return;
+  }
+
+  if (opts.print || opts.dryRun) {
+    return; // Tier-2: just show the command
+  }
 
   if (opts.copy) {
     console.log(
@@ -614,7 +636,7 @@ async function runSlash(name: string, rest: string[]): Promise<void> {
       return;
     case "builtin":
     case "builtins":
-      await runBuiltinPage();
+      await runBuiltinPage(rest[0], rest.slice(1));
       return;
     case "undo":
       runUndoCommand(rest.includes("--list") ? undefined : rest[0], rest.includes("--list"));
@@ -624,6 +646,14 @@ async function runSlash(name: string, rest: string[]): Promise<void> {
       return;
     case "commands":
       printCommands();
+      return;
+    case "commit":
+    case "cm":
+      await runFreshCommit({});
+      return;
+    case "recommit":
+    case "rec":
+      await runRecommit({});
       return;
     case "help":
       printHelp();
@@ -868,6 +898,56 @@ program
     printCommands();
   });
 
+program
+  .command("commit [task...]")
+  .alias("cm")
+  .description(
+    "No args: fresh commit from staged changes with an AI-written message.\n With task text: normal AI task (e.g. meero commit all my changes)",
+  )
+  .option("-m, --message <text>", "use this message instead of the AI one")
+  .option("-a, --all", "stage all changes automatically (no prompt)")
+  .option("-t, --template <format>", "message format, e.g. \"(feat): message\"")
+  .option("-l, --language <lang>", "message language (default en)")
+  .action(
+    async (
+      task: string[],
+      opts: FreshCommitOpts,
+    ): Promise<void> => {
+      // "meero commit all my changes" stays a plain AI task — the fresh-commit
+      // flow only starts when `commit` is used bare.
+      if (task && task.length > 0) {
+        const route = routeInput(task.join(" "));
+        if (route.kind === "ai") return handleTask(route.text, program.opts<RunOpts>());
+        if (route.kind === "chat") return console.log(chalk.yellow(CASUAL_REPLY));
+        if (route.kind === "pack") return runBuiltinPage(route.id, route.rest);
+        if (route.kind === "slash") return runSlash(route.name, route.rest);
+        if (route.kind === "meta") {
+          console.log(
+            "That looks like a meero config request — run: meero setup · meero settings · meero model",
+          );
+          return;
+        }
+        return printHelp();
+      }
+      await runFreshCommit(opts);
+    },
+  );
+
+program
+  .command("recommit")
+  .alias("rec")
+  .description(
+    "Rewrite existing commit messages with AI (conventional commits)",
+  )
+  .option("--dry-run", "show old → new messages; change nothing")
+  .option("-n, --max-commits <n>", "only the last N commits", parseInt)
+  .option("--all", "rewrite even well-formed messages")
+  .option("-t, --template <format>", "message format, e.g. \"(feat): message\"")
+  .option("-l, --language <lang>", "message language (default en)")
+  .action(async (opts: RecommitOpts) => {
+    await runRecommit(opts);
+  });
+
 function printCommands(): void {
   console.log(buildCommandsReference());
 }
@@ -880,9 +960,11 @@ function printHelp(): void {
 
   USAGE
     ${chalk.cyan("meero")} "your task"        Generate and run shell commands (AI)
+    ${chalk.cyan("meero")} "question"         Ask a technical question (explained, no commands)
     ${chalk.cyan("meero")} <pack> [args]      Run a pre-built pack — no AI
     ${chalk.cyan("meero")} /<command>         Slash form of every command below
-    ${chalk.cyan("meero")}                    this help — meero has no chat mode
+    ${chalk.cyan("meero")}                    interactive task mode (TTY) / help in scripts
+    ${chalk.cyan("meero interactive")}          start interactive multi-step REPL (i, repl)
 
   FLAGS
     --print / --dry-run      Generate only; show, never execute
@@ -895,6 +977,8 @@ function printHelp(): void {
     setup                  Configure your API key and model
     model                  Switch the active model
     settings               Model, provider and cheap mode in one page
+    commit (cm)            Fresh commit from staged changes — AI message
+    recommit (rec)         Rewrite past commit messages with AI
     undo                   Revert files changed by the last task
     undo --list            List undo snapshots
     history                Recent tasks and their outcomes
@@ -914,6 +998,7 @@ function printHelp(): void {
 
   SLASH FORM (same commands, no AI call)
     meero /settings  /model  /builtin  /undo  /trust  /commands  /help  /exit
+    meero /commit    /recommit
 
   ALWAYS ON
     safety gate · blast-radius preview · web cross-check
@@ -988,6 +1073,9 @@ const slashEarly = rawParts[0]?.startsWith("/") === true && !rawArgv[0]?.startsW
 if (slashEarly) {
   const head = rawParts[0]!;
   await runSlash(head.slice(1).toLowerCase(), rawParts.slice(1));
+} else if (rawArgv.length === 0) {
+  // No task given: print help. There is no chat mode.
+  printHelp();
 } else {
   program.parse();
 }

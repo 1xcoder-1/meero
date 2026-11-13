@@ -98,7 +98,8 @@ bun install`}</code>
       <Pre>
         <code>{`meero -v        # version
 meero help      # the help box
-meero doctor    # node / npm / git / docker health check, no AI needed`}</code>
+meero doctor    # node / npm / git / docker health check, no AI needed
+meero interactive  # start interactive multi-step task mode`}</code>
       </Pre>
 
       <Pager prev={p.prev} next={p.next} />

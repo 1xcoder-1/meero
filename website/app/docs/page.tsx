@@ -41,7 +41,7 @@ $ meero what is the command to initialise a vite project`}</code>
       </ul>
 
       <Callout kind="info">
-        meero runs one task per call. There is no chat mode and nothing to
+        meero can run a single task or start interactive mode for multi-step work. Casual chat is not supported and nothing to
         exit. Typing <C>meero</C> alone shows the help box.
       </Callout>
 

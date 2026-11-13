@@ -33,7 +33,9 @@ export async function runSandboxed(
     "run",
     "--rm",
     "-v",
-    `${cwd}:/work`,
+    // Docker on Windows rejects backslash mounts (I:\meero -> invalid) —
+    // normalize to forward slashes first.
+    `${cwd.replace(/\\/g, "/")}:/work`,
     "-w",
     "/work",
     image,

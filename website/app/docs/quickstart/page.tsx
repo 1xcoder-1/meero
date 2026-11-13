@@ -67,7 +67,7 @@ meero undo --list         # available snapshots`}</code>
       <h2>What meero never does</h2>
       <ul>
         <li><strong>No chat.</strong> <C>meero hi</C> is refused before any AI call. meero is a developer tool, not a chatbot.</li>
-        <li><strong>No silent execution.</strong> Nothing runs without your consent unless you explicitly set <Link href="/docs/safety">trust high</Link>, and even then the safety gate stays armed.</li>
+      <li><strong>No silent execution.</strong> Nothing runs without your consent unless you explicitly set <Link href="/docs/safety">trust high</Link>, and even then the safety gate stays armed.</li>
         <li><strong>No runaway cost.</strong> Every AI task prints its token usage and dollar estimate.</li>
       </ul>
 

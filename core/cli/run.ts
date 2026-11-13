@@ -49,11 +49,26 @@ export async function runCMDCapture(cmd: string): Promise<CMDResult> {
   const proc = Bun.spawn(detectShell().argv(cmd), {
     stdout: "pipe",
     stderr: "pipe",
+    // interactive commands (sudo password, npm init, ssh prompts) need stdin,
+    // otherwise they hang forever
+    stdin: "inherit",
   });
 
-  const output = await drainStreams(proc);
-  // `exited` is the reliable source: `exitCode` can resolve null after
-  // the streams were drained first (verified live on Bun 1.4.4 / win32)
-  const exitCode = (await proc.exited) ?? -1;
-  return { cmd, exitCode, output };
+  // hard timeout: a hung command must never freeze the whole CLI
+  const TIMEOUT_MS = 5 * 60 * 1000;
+  const timer = setTimeout(() => {
+    try {
+      proc.kill();
+    } catch {}
+  }, TIMEOUT_MS);
+
+  try {
+    const output = await drainStreams(proc);
+    // `exited` is the reliable source: `exitCode` can resolve null after
+    // the streams were drained first (verified live on Bun 1.4.4 / win32)
+    const exitCode = (await proc.exited) ?? -1;
+    return { cmd, exitCode, output };
+  } finally {
+    clearTimeout(timer);
+  }
 }

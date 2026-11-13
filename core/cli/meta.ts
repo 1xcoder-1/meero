@@ -15,3 +15,9 @@ export function isMetaRequest(text: string): boolean {
   if (!t) return false;
   return CONFIG_RE.test(t) || MODEL_RE.test(t);
 }
+
+export function showMetaReply(): void {
+  console.log(
+    "That looks like a meero config request — run: meero setup · meero settings · meero model",
+  );
+}
