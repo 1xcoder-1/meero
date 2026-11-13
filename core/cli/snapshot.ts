@@ -186,6 +186,9 @@ export function extractTargets(
   cwd = process.cwd(),
 ): string[] {
   const found = new Set<string>();
+  // Creation verbs (touch/mkdir/new-item) target files that do not exist
+  // yet — they must be registered so `meero undo` can delete them.
+  const CREATION_VERBS = new Set(["touch", "mkdir", "new-item", "ni"]);
 
   for (const cmd of commands) {
     const { verb, args, redirect } = parseCommand(cmd);
@@ -199,9 +202,6 @@ export function extractTargets(
     }
 
     if (READONLY_STARTS.has(verb) || !WRITE_VERBS.has(verb)) continue;
-    // Creation verbs (touch/mkdir/new-item) target files that do not exist
-    // yet — they must be registered so `meero undo` can delete them.
-    const CREATION_VERBS = new Set(["touch", "mkdir", "new-item", "ni"]);
     for (const t of args) {
       if (!looksLikePath(t)) continue;
       for (const p of expandGlob(t, cwd)) {

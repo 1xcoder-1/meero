@@ -43,8 +43,17 @@ export async function runSandboxed(
     "-lc",
     cmd,
   ];
-  const proc = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe" });
-  const output = await drainStreams(proc);
-  const exitCode = (await proc.exited) ?? -1;
-  return { cmd, exitCode, output };
+  const proc = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe", stdin: "inherit" });
+
+  // hard timeout — a hung container command must never freeze the CLI
+  const timer = setTimeout(() => {
+    try { proc.kill(); } catch {}
+  }, 5 * 60 * 1000);
+  try {
+    const output = await drainStreams(proc);
+    const exitCode = (await proc.exited) ?? -1;
+    return { cmd, exitCode, output };
+  } finally {
+    clearTimeout(timer);
+  }
 }
